@@ -8,12 +8,10 @@
 import os
 import time
 import uuid
-import json
-import subprocess
 import threading
 import socket
 import requests
-from typing import Dict, List, Any, Optional
+from typing import List
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
@@ -40,23 +38,27 @@ from crewai import Agent, Task, Crew
 from langgraph.graph import StateGraph, END
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
 from huggingface_hub import InferenceClient
-import networkx as nx
 
 # --- REAL TOOLS ---
 @tool
 def search_web(query: str) -> str:
     """Real web search via DuckDuckGo API."""
     try:
-        resp = requests.get("https://api.duckduckgo.com", params={"q": query, "format": "json"})
+        resp = requests.get("https://api.duckduckgo.com", params={"q": query, "format": "json"}, timeout=10)
+        resp.raise_for_status()
         data = resp.json()
         return data.get("Abstract", "No results")[:1000]
-    except:
-        return "Search failed."
+    except requests.RequestException as e:
+        return f"Search failed: {str(e)}"
+    except Exception as e:
+        return f"Search error: {str(e)}"
 
 @tool
 def write_file(path: str, content: str) -> str:
     """Write real file to disk."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    dir_path = os.path.dirname(path)
+    if dir_path:  # Only create directories if path includes a directory component
+        os.makedirs(dir_path, exist_ok=True)
     with open(path, "w") as f:
         f.write(content)
     return f"Written: {path}"
@@ -67,8 +69,12 @@ def read_file(path: str) -> str:
     try:
         with open(path, "r") as f:
             return f.read()
-    except:
-        return "File not found."
+    except FileNotFoundError:
+        return f"File not found: {path}"
+    except PermissionError:
+        return f"Permission denied: {path}"
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
 
 @tool
 def generate_code(prompt: str) -> str:
@@ -82,8 +88,8 @@ def hf_inference(model: str, input_text: str) -> str:
     client = InferenceClient(token=HF_TOKEN)
     try:
         return client.text_generation(input_text, model=model, max_new_tokens=512)
-    except:
-        return "HF inference failed."
+    except Exception as e:
+        return f"HF inference failed: {str(e)}"
 
 # --- FRACTAL AGENT FORGE (Core Spawner) ---
 class FractalAgent:
@@ -154,14 +160,20 @@ crew = Crew(agents=[researcher, coder], tasks=[task1, task2], verbose=1)
 
 # --- AUTOGEN-STYLE DEBATE (Real Sockets) ---
 def debate_server():
+    """Server for agent debate via sockets."""
     s = socket.socket()
-    s.bind(("127.0.0.1", 9999))
-    s.listen(1)
-    conn, _ = s.accept()
-    conn.send(b"Trend valid?")
-    response = conn.recv(1024)
-    conn.close()
-    return response.decode()
+    try:
+        s.bind(("127.0.0.1", 9999))
+        s.listen(1)
+        conn, _ = s.accept()
+        try:
+            conn.send(b"Trend valid?")
+            response = conn.recv(1024)
+            return response.decode()
+        finally:
+            conn.close()
+    finally:
+        s.close()
 
 # --- LLAMAINDEX KNOWLEDGE BASE ---
 def build_index():
