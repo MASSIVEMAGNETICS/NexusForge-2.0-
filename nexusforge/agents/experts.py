@@ -149,7 +149,7 @@ class MultiModalExpertSystem:
         modality: Optional[ExpertModality] = None
     ) -> Optional[str]:
         """
-        Select the best expert for a task
+        Select the best expert for a task using capability matching
         """
         # If modality specified, filter by it
         if modality:
@@ -162,9 +162,31 @@ class MultiModalExpertSystem:
         if not expert_ids:
             return None
         
-        # For now, return first available expert
-        # In production, this would use more sophisticated selection
-        return expert_ids[0]
+        # Score experts based on capability matching
+        task_str = str(task).lower()
+        best_expert = None
+        best_score = -1
+        
+        for expert_id in expert_ids:
+            expert = self.experts[expert_id]
+            score = 0
+            
+            # Score based on capability matches
+            for capability in expert.capabilities:
+                if capability.lower() in task_str:
+                    score += 1
+            
+            # Score based on specialization matches
+            for spec in expert.specializations:
+                if spec.lower() in task_str:
+                    score += 2  # Specializations count more
+            
+            if score > best_score:
+                best_score = score
+                best_expert = expert_id
+        
+        # Return best match, or first available if no matches
+        return best_expert if best_expert else expert_ids[0]
     
     def _infer_modality(self, task: Dict[str, Any]) -> Optional[ExpertModality]:
         """Infer the modality needed for a task"""

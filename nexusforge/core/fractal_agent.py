@@ -21,7 +21,7 @@ class AgentTemplate:
     capabilities: List[str]
     goal_template: str
     max_depth: int = 5
-    spawn_threshold: float = 0.7
+    spawn_threshold: float = 0.7  # Threshold for complexity that triggers child spawning (0.0-1.0)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 

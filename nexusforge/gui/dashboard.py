@@ -168,24 +168,37 @@ class NexusDashboard:
             if not goal:
                 return jsonify({"error": "Goal is required"}), 400
             
-            # Run bootstrap asynchronously
-            import asyncio
+            # Run bootstrap in a thread to avoid blocking the web server
+            import threading
+            result_container = {'root_agent_id': None, 'error': None}
             
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                root_agent_id = loop.run_until_complete(
-                    self.nexus.bootstrap_from_goal(goal)
-                )
-                loop.close()
-                
-                return jsonify({
-                    "success": True,
-                    "root_agent_id": root_agent_id,
-                    "message": "System bootstrapped successfully"
-                })
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
+            def run_bootstrap():
+                try:
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    result_container['root_agent_id'] = loop.run_until_complete(
+                        self.nexus.bootstrap_from_goal(goal)
+                    )
+                    loop.close()
+                except Exception as e:
+                    result_container['error'] = str(e)
+            
+            thread = threading.Thread(target=run_bootstrap)
+            thread.start()
+            thread.join(timeout=30)  # 30 second timeout
+            
+            if thread.is_alive():
+                return jsonify({"error": "Bootstrap timeout"}), 504
+            
+            if result_container['error']:
+                return jsonify({"error": result_container['error']}), 500
+            
+            return jsonify({
+                "success": True,
+                "root_agent_id": result_container['root_agent_id'],
+                "message": "System bootstrapped successfully"
+            })
     
     def _setup_socketio_handlers(self):
         """Set up WebSocket handlers for real-time updates"""
