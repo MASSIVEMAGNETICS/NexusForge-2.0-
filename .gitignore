@@ -28,7 +28,11 @@ runtime/
 runtime_out/
 output/
 persist/
-data/
+
+# Data directory (but keep example docs)
+data/*
+!data/nexusforge_docs.md
+!data/.gitkeep
 
 # Environment
 .env
