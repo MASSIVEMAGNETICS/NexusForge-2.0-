@@ -23,6 +23,11 @@ HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 USE_LOCAL_MODEL = os.getenv("USE_LOCAL_MODEL", "false").lower() == "true"
 
 # Local lightweight model for offline/low-resource operations
+class LocalLLMResponse:
+    """Response object for LocalLLM."""
+    def __init__(self, text):
+        self.content = text
+
 class LocalLLM:
     """Lightweight local LLM fallback using rule-based responses."""
     
@@ -32,7 +37,15 @@ class LocalLLM:
     
     def invoke(self, messages):
         """Simple rule-based response generation for offline mode."""
-        content = messages[0].content if messages else ""
+        # Validate messages structure
+        if not messages or not hasattr(messages[0], 'content'):
+            return LocalLLMResponse("Error: Invalid message format")
+        
+        content = messages[0].content
+        
+        # Ensure content is a string
+        if not isinstance(content, str):
+            content = str(content) if content else ""
         
         # Basic pattern matching for common tasks
         if "code" in content.lower() or "function" in content.lower():
@@ -41,17 +54,13 @@ class LocalLLM:
     print(f"Processing: {param}")
     return param"""
         elif "search" in content.lower() or "find" in content.lower():
-            response = "Local mode: Search functionality requires online API. Using cached knowledge."
+            response = "Local mode: Search unavailable in offline mode. Using rule-based responses."
         elif "trend" in content.lower():
             response = "AI trend 2025: Edge AI, federated learning, and efficient local models"
         else:
             response = f"Local model processing: {content[:100]}... [Offline mode - limited capabilities]"
         
-        class Response:
-            def __init__(self, text):
-                self.content = text
-        
-        return Response(response)
+        return LocalLLMResponse(response)
 
 # Use Groq if available, else OpenAI, else local fallback
 if USE_LOCAL_MODEL or (not GROQ_API_KEY and not OPENAI_API_KEY):

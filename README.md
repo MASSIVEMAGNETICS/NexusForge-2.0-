@@ -67,8 +67,10 @@ The system will:
 3. Run LangGraph workflows
 4. Perform AutoGen-style debates via sockets
 5. Query the LlamaIndex knowledge base
-6. Execute Hugging Face inference (online) or local fallback (offline)
-7. Self-build new functions (BabyAGI style)
+6. Execute Hugging Face inference (requires HF token) or skip if unavailable
+7. Self-build new functions (BabyAGI style) using local model in offline mode
+
+**Note**: In offline mode, the main LLM (Groq/OpenAI) is replaced by the local model. Hugging Face inference requires a token and internet connection - it will fail gracefully if unavailable.
 
 ## Output
 
