@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -20,10 +23,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-env/
-ENV/
+# Runtime artifacts
+runtime/
+runtime_out/
+output/
+persist/
+
+# Data directory (but keep example docs)
+data/*
+!data/nexusforge_docs.md
+!data/.gitkeep
+
+# Environment
+.env
 .venv
 
 # IDE
@@ -32,28 +44,4 @@ ENV/
 *.swp
 *.swo
 *~
-
-# Environment
-.env
-.env.local
-
-# Logs
-logs/
-*.log
-
-# Data
-data/
-*.db
-*.sqlite
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Docker
-docker-compose.override.yml

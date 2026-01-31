@@ -1,312 +1,131 @@
-# 🚀 NexusForge 2.0
+# NexusForge 3.0 – Live Agent Swarm System
 
-**AGI-lite Autonomous Agent Framework**
+Forge Fractal Agents that integrate multiple AI frameworks into a single, powerful system.
 
-NexusForge 2.0 fuses FractalAgentForge's recursive templates with Auto-GPT's goal-breaking, BabyAGI's self-building functions, SuperAGI's production GUI, JARVIS's multi-modal experts, AutoGen's agent chats, and CrewAI's role crews. Bootstrap from a goal: spawn fractal hierarchies that converse, delegate, and evolve via dashboards and triggers—no deps, Docker-ready.
+## Overview
 
-From R&D swarms to viral apps, it's AGI-lite autonomy in ~600MB. Open-source the uprising!
+NexusForge 3.0 is a live, single-file, real-world agent swarm that fuses multiple AI frameworks:
 
-## ✨ Features
+- **FractalAgentForge** - Hierarchical agent spawning
+- **Auto-GPT** - Autonomous agent capabilities
+- **BabyAGI** - Self-building and task management
+- **SuperAGI** - Advanced orchestration
+- **JARVIS** - Hugging Face integration
+- **LangChain** - Tool and LLM abstraction
+- **AutoGen** - Multi-agent debate via sockets
+- **CrewAI** - Team-based coordination
+- **LangGraph** - Workflow state management
+- **LlamaIndex** - Vector storage and knowledge base
+- **Semantic Kernel** - Advanced reasoning
 
-- **🌳 Fractal Agent Hierarchies**: Recursive agent spawning with depth control (FractalAgentForge-inspired)
-- **🎯 Goal Decomposition**: Automatic task breaking and subtask delegation (Auto-GPT-style)
-- **🔧 Self-Building Functions**: Agents dynamically register new capabilities (BabyAGI-inspired)
-- **💬 Agent Conversations**: Multi-agent communication and collaboration (AutoGen-style)
-- **👥 Role-Based Crews**: Organize agents into specialized teams (CrewAI-inspired)
-- **🎓 Multi-Modal Experts**: Specialized experts for different domains (JARVIS-inspired)
-- **🖥️ Production Dashboard**: Real-time monitoring and control GUI (SuperAGI-style)
-- **🐳 Docker Ready**: Containerized deployment with minimal dependencies
-- **⚡ Bootstrap from Goals**: Start with a high-level objective, let agents handle the rest
+All with **real API calls, real file writes, real subprocesses, and real sockets**. No mocks. No simulations.
 
-## 🏗️ Architecture
+## Installation
 
-```
-NexusForge
-├── Core
-│   ├── Fractal Agent System (recursive spawning)
-│   └── Main Orchestrator (unified API)
-├── Communication Hub
-│   ├── Agent-to-Agent Messaging
-│   ├── Task Delegation
-│   └── Conversation History
-├── Agent Systems
-│   ├── Crew Manager (role-based teams)
-│   └── Expert System (multi-modal specialists)
-└── GUI/CLI
-    ├── Web Dashboard (monitoring & control)
-    └── Command Line Interface
-```
-
-## 🚀 Quick Start
-
-### Installation
-
+1. Clone the repository:
 ```bash
-# Clone the repository
 git clone https://github.com/MASSIVEMAGNETICS/NexusForge-2.0-.git
 cd NexusForge-2.0-
+```
 
-# Install dependencies
+2. Install dependencies:
+```bash
 pip install -r requirements.txt
 ```
 
-### Using Docker
-
+3. Set up environment variables:
 ```bash
-# Build and run with Docker Compose
-docker-compose up -d
-
-# Access the dashboard at http://localhost:8080
+cp .env.example .env
+# Edit .env and add your API keys (optional for offline mode)
 ```
 
-### Bootstrap from a Goal
+API keys (optional - system works without them in offline mode):
+- `GROQ_API_KEY` (preferred) or `OPENAI_API_KEY` - Get from [Groq Console](https://console.groq.com/) or [OpenAI](https://platform.openai.com/)
+- `HUGGINGFACEHUB_API_TOKEN` - Get from [Hugging Face](https://huggingface.co/settings/tokens)
+- `USE_LOCAL_MODEL=true` - Enable offline/low-resource mode with built-in model
 
+## Usage
+
+### Online Mode (with API keys)
+Run the agent swarm with full capabilities:
 ```bash
-# Start with a high-level goal
-python -m nexusforge bootstrap "Build a web scraper for news articles"
-
-# With GUI dashboard
-python -m nexusforge bootstrap "Research AI trends and create a report" --with-gui
+python nexusforge.py
 ```
 
-### Start the Dashboard
-
+### Offline Mode (no API keys required)
+Run with built-in local model for low-resource/offline operations:
 ```bash
-python -m nexusforge gui
-# Open http://localhost:8080
+export USE_LOCAL_MODEL=true
+python nexusforge.py
 ```
 
-## 📚 Usage Examples
+Or simply run without any API keys configured - the system will automatically use the local fallback model.
 
-### Basic Usage
+The system will:
+1. Spawn fractal agents hierarchically
+2. Execute CrewAI team tasks (research + coding)
+3. Run LangGraph workflows
+4. Perform AutoGen-style debates via sockets
+5. Query the LlamaIndex knowledge base
+6. Execute Hugging Face inference (requires HF token) or skip if unavailable
+7. Self-build new functions (BabyAGI style) using local model in offline mode
 
+**Note**: In offline mode, the main LLM (Groq/OpenAI) is replaced by the local model. Hugging Face inference requires a token and internet connection - it will fail gracefully if unavailable.
+
+## Output
+
+Generated files will be placed in:
+- `./runtime/` - Self-built Python code
+- `./runtime_out/` - Agent outputs
+- `./output/` - Agent-specific files
+- `./persist/` - LlamaIndex vector storage
+
+## Features
+
+✅ **Real API Integration** - Live calls to Groq/OpenAI, Hugging Face  
+✅ **Offline Mode** - Built-in local model for operations without API keys  
+✅ **Real File Operations** - Actual disk writes and reads  
+✅ **Real Socket Communication** - TCP sockets for agent debates  
+✅ **Multi-threaded Execution** - Concurrent agent operations  
+✅ **Fractal Architecture** - Agents spawn child agents recursively  
+✅ **Web Search** - DuckDuckGo API integration  
+✅ **Code Generation** - LLM-powered Python code creation  
+✅ **Knowledge Base** - Vector storage with LlamaIndex  
+✅ **Low Resource Mode** - Works on systems with limited resources or no internet  
+
+## Architecture
+
+### Fractal Agent Forge
+The core spawner creates hierarchical agent structures:
 ```python
-import asyncio
-from nexusforge import NexusForge
-
-async def main():
-    # Initialize NexusForge
-    nexus = NexusForge()
-    await nexus.start()
-    
-    # Bootstrap from a goal
-    goal = "Research AI developments and create a presentation"
-    root_agent_id = await nexus.bootstrap_from_goal(goal)
-    
-    # View the agent hierarchy
-    hierarchy = nexus.get_agent_hierarchy(root_agent_id)
-    print(f"Created {len(hierarchy['children'])} child agents")
-    
-    # Get system statistics
-    stats = nexus.get_statistics()
-    print(f"Total agents: {stats['agent_stats']['total']}")
-    
-    await nexus.stop()
-
-asyncio.run(main())
+root = FractalAgent("Orchestrator", "Turn trends into code")
+researcher = root.spawn("Researcher", "Find trends")
+coder = root.spawn("Coder", "Generate code")
 ```
 
-### Creating a Specialized Crew
+### Tool System
+Integrated tools via LangChain:
+- `search_web()` - DuckDuckGo search
+- `write_file()` - File operations
+- `read_file()` - File reading
+- `generate_code()` - LLM code generation
+- `hf_inference()` - Hugging Face models
 
-```python
-from nexusforge import NexusForge
-from nexusforge.core.fractal_agent import AgentTemplate
-from nexusforge.agents.crew import CrewRole
+### Agent Teams
+CrewAI coordination with specialized agents:
+- **Trend Researcher** - Finds emerging AI trends
+- **Code Generator** - Writes production Python
 
-async def create_dev_team():
-    nexus = NexusForge()
-    await nexus.start()
-    
-    # Create specialized agents
-    agents = [
-        nexus.create_agent_from_template(AgentTemplate(
-            name="TechLead",
-            role="Leader",
-            capabilities=["plan", "coordinate", "review"],
-            goal_template="Lead development"
-        )),
-        nexus.create_agent_from_template(AgentTemplate(
-            name="Developer",
-            role="Builder",
-            capabilities=["code", "test", "debug"],
-            goal_template="Write code"
-        ))
-    ]
-    
-    # Create a crew
-    crew_id = nexus.create_crew(
-        name="DevTeam",
-        agent_ids=[a.agent_id for a in agents],
-        roles=[CrewRole.LEADER, CrewRole.BUILDER],
-        goals=["Build a REST API"]
-    )
-    
-    return crew_id
-```
+### Workflow Engine
+LangGraph state management for multi-step processes
 
-## 🎯 CLI Commands
+### Knowledge Base
+LlamaIndex for document storage and semantic search
 
-```bash
-# Bootstrap from goal
-nexusforge bootstrap "Your goal here"
+## Contributing
 
-# Start GUI dashboard
-nexusforge gui
+Contributions welcome! This is a living system designed to evolve.
 
-# Show system status
-nexusforge status
+## License
 
-# List components
-nexusforge list agents
-nexusforge list crews
-nexusforge list experts
-nexusforge list messages
-
-# View agent hierarchy
-nexusforge hierarchy
-
-# Show detailed statistics
-nexusforge stats
-```
-
-## 🔧 Configuration
-
-Create a `.env` file (see `.env.example`):
-
-```bash
-NEXUSFORGE_ENV=production
-NEXUSFORGE_LOG_LEVEL=INFO
-DASHBOARD_HOST=0.0.0.0
-DASHBOARD_PORT=8080
-MAX_AGENT_DEPTH=5
-SPAWN_THRESHOLD=0.7
-```
-
-## 📊 Dashboard Features
-
-The web dashboard provides:
-
-- **Real-time System Status**: Monitor agents, crews, and experts
-- **Agent Hierarchy Visualization**: See the fractal structure
-- **Message History**: Track agent communications
-- **Bootstrap Interface**: Start new agent systems from goals
-- **Statistics Dashboard**: Detailed system metrics
-
-## 🏛️ System Components
-
-### Fractal Agents
-- Recursive spawning up to configurable depth
-- Automatic goal decomposition
-- Parent-child communication
-- Dynamic capability registration
-
-### Communication Hub
-- Message passing between agents
-- Task delegation system
-- Broadcast capabilities
-- Conversation tracking
-
-### Crew Manager
-- Role-based team organization
-- Leader assignment
-- Crew-wide broadcasting
-- Goal tracking
-
-### Expert System
-- Multi-modal specialization (text, code, data, etc.)
-- Automatic expert selection
-- Capability-based routing
-- Pluggable expert functions
-
-## 🧪 Examples
-
-See the `examples/` directory for:
-- `basic_usage.py`: Simple bootstrapping example
-- `crew_example.py`: Creating and managing crews
-- More examples coming soon!
-
-## 🐳 Docker Deployment
-
-The system is optimized for containerized deployment:
-
-```bash
-# Build the image
-docker build -t nexusforge .
-
-# Run with custom configuration
-docker run -p 8080:8080 -p 5000:5000 \
-  -e NEXUSFORGE_ENV=production \
-  -v $(pwd)/data:/app/data \
-  nexusforge
-```
-
-Target size: ~600MB
-
-## 🔬 Development
-
-```bash
-# Install in development mode
-pip install -e .
-
-# Run tests (when available)
-pytest
-
-# Run linting (when available)
-flake8 nexusforge/
-```
-
-## 🎨 Use Cases
-
-- **R&D Swarms**: Autonomous research teams
-- **Application Development**: Self-organizing dev teams
-- **Data Processing Pipelines**: Adaptive data workflows
-- **Content Generation**: Multi-agent content creation
-- **Task Automation**: Complex workflow automation
-- **Experimental AGI**: Research platform for autonomous systems
-
-## 🚧 Roadmap
-
-- [ ] LLM integration for enhanced reasoning
-- [ ] Persistent storage for agent state
-- [ ] Advanced visualization tools
-- [ ] Plugin system for custom experts
-- [ ] Distributed agent deployment
-- [ ] Enhanced security features
-- [ ] Performance optimization
-- [ ] Extended test coverage
-
-## 📖 Documentation
-
-- [Architecture Overview](docs/architecture.md)
-- [Agent System](docs/agents.md)
-- [Communication System](docs/communication.md)
-- [Crew Management](docs/crews.md)
-- [Expert System](docs/experts.md)
-- [API Reference](docs/api.md)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) for details
-
-## 🙏 Acknowledgments
-
-Inspired by:
-- FractalAgentForge (recursive templates)
-- Auto-GPT (goal breaking)
-- BabyAGI (self-building functions)
-- SuperAGI (production GUI)
-- JARVIS (multi-modal experts)
-- AutoGen (agent conversations)
-- CrewAI (role-based crews)
-
-## 📞 Contact
-
-For questions, issues, or contributions, please open an issue on GitHub.
-
----
-
-**Open-source the uprising! 🚀**
+MIT License - See LICENSE file for details
