@@ -36,19 +36,30 @@ pip install -r requirements.txt
 3. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env and add your API keys
+# Edit .env and add your API keys (optional for offline mode)
 ```
 
-Required API keys:
+API keys (optional - system works without them in offline mode):
 - `GROQ_API_KEY` (preferred) or `OPENAI_API_KEY` - Get from [Groq Console](https://console.groq.com/) or [OpenAI](https://platform.openai.com/)
 - `HUGGINGFACEHUB_API_TOKEN` - Get from [Hugging Face](https://huggingface.co/settings/tokens)
+- `USE_LOCAL_MODEL=true` - Enable offline/low-resource mode with built-in model
 
 ## Usage
 
-Run the agent swarm:
+### Online Mode (with API keys)
+Run the agent swarm with full capabilities:
 ```bash
 python nexusforge.py
 ```
+
+### Offline Mode (no API keys required)
+Run with built-in local model for low-resource/offline operations:
+```bash
+export USE_LOCAL_MODEL=true
+python nexusforge.py
+```
+
+Or simply run without any API keys configured - the system will automatically use the local fallback model.
 
 The system will:
 1. Spawn fractal agents hierarchically
@@ -56,7 +67,7 @@ The system will:
 3. Run LangGraph workflows
 4. Perform AutoGen-style debates via sockets
 5. Query the LlamaIndex knowledge base
-6. Execute Hugging Face inference
+6. Execute Hugging Face inference (online) or local fallback (offline)
 7. Self-build new functions (BabyAGI style)
 
 ## Output
@@ -70,6 +81,7 @@ Generated files will be placed in:
 ## Features
 
 ✅ **Real API Integration** - Live calls to Groq/OpenAI, Hugging Face  
+✅ **Offline Mode** - Built-in local model for operations without API keys  
 ✅ **Real File Operations** - Actual disk writes and reads  
 ✅ **Real Socket Communication** - TCP sockets for agent debates  
 ✅ **Multi-threaded Execution** - Concurrent agent operations  
@@ -77,6 +89,7 @@ Generated files will be placed in:
 ✅ **Web Search** - DuckDuckGo API integration  
 ✅ **Code Generation** - LLM-powered Python code creation  
 ✅ **Knowledge Base** - Vector storage with LlamaIndex  
+✅ **Low Resource Mode** - Works on systems with limited resources or no internet  
 
 ## Architecture
 
