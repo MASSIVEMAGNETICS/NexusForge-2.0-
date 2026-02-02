@@ -24,7 +24,7 @@ class ExpertModality(Enum):
 
 @dataclass
 class ExpertProfile:
-    """Profile of an expert agent"""
+    """Profile of an expert agent with performance tracking"""
     expert_id: str
     name: str
     modality: ExpertModality
@@ -32,6 +32,23 @@ class ExpertProfile:
     capabilities: List[str]
     confidence_threshold: float = 0.7
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Performance tracking (new fields)
+    total_tasks: int = 0
+    successful_tasks: int = 0
+    failed_tasks: int = 0
+    avg_completion_time: float = 0.0
+    expertise_level: float = 1.0  # 0.0 to 2.0, starts at 1.0
+
+
+@dataclass
+class TaskResult:
+    """Result of a task executed by an expert"""
+    task_id: str
+    expert_id: str
+    success: bool
+    completion_time: float
+    confidence_score: float
+    error_message: Optional[str] = None
 
 
 class MultiModalExpertSystem:
@@ -48,6 +65,7 @@ class MultiModalExpertSystem:
             modality: [] for modality in ExpertModality
         }
         self.expert_functions: Dict[str, Dict[str, Callable]] = {}
+        self.task_history: List[TaskResult] = []  # Track task performance
         self.logger = logging.getLogger("MultiModalExpertSystem")
         
         # Initialize default experts
@@ -149,7 +167,8 @@ class MultiModalExpertSystem:
         modality: Optional[ExpertModality] = None
     ) -> Optional[str]:
         """
-        Select the best expert for a task using capability matching
+        Select the best expert for a task using enhanced capability matching
+        and performance history
         """
         # If modality specified, filter by it
         if modality:
@@ -162,7 +181,7 @@ class MultiModalExpertSystem:
         if not expert_ids:
             return None
         
-        # Score experts based on capability matching
+        # Score experts based on multiple factors
         task_str = str(task).lower()
         best_expert = None
         best_score = -1
@@ -171,22 +190,109 @@ class MultiModalExpertSystem:
             expert = self.experts[expert_id]
             score = 0
             
-            # Score based on capability matches
+            # Base score from capability matches
             for capability in expert.capabilities:
                 if capability.lower() in task_str:
                     score += 1
             
-            # Score based on specialization matches
+            # Enhanced: Score based on specialization matches (weighted higher)
             for spec in expert.specializations:
                 if spec.lower() in task_str:
                     score += 2  # Specializations count more
+            
+            # NEW: Factor in performance metrics
+            if expert.total_tasks > 0:
+                success_rate = expert.successful_tasks / expert.total_tasks
+                score *= (0.5 + success_rate)  # Boost score by success rate (0.5x to 1.5x)
+            
+            # NEW: Factor in expertise level
+            score *= expert.expertise_level
             
             if score > best_score:
                 best_score = score
                 best_expert = expert_id
         
         # Return best match, or first available if no matches
-        return best_expert if best_expert else expert_ids[0]
+        selected = best_expert if best_expert else expert_ids[0]
+        self.logger.info(f"Selected expert {selected} with score {best_score:.2f}")
+        return selected
+    
+    def record_task_result(self, result: TaskResult):
+        """
+        Record the result of a task to update expert performance metrics
+        """
+        self.task_history.append(result)
+        
+        if result.expert_id not in self.experts:
+            return
+        
+        expert = self.experts[result.expert_id]
+        expert.total_tasks += 1
+        
+        if result.success:
+            expert.successful_tasks += 1
+            # Increase expertise level on success (up to 2.0)
+            expert.expertise_level = min(2.0, expert.expertise_level + 0.01)
+        else:
+            expert.failed_tasks += 1
+            # Slightly decrease expertise level on failure (down to 0.5)
+            expert.expertise_level = max(0.5, expert.expertise_level - 0.02)
+        
+        # Update average completion time (rolling average)
+        if expert.avg_completion_time == 0:
+            expert.avg_completion_time = result.completion_time
+        else:
+            # Exponential moving average
+            alpha = 0.2
+            expert.avg_completion_time = (
+                alpha * result.completion_time + 
+                (1 - alpha) * expert.avg_completion_time
+            )
+        
+        self.logger.info(
+            f"Updated expert {result.expert_id}: "
+            f"success_rate={expert.successful_tasks}/{expert.total_tasks}, "
+            f"expertise={expert.expertise_level:.2f}"
+        )
+    
+    def get_expert_performance(self, expert_id: str) -> Dict[str, Any]:
+        """Get performance metrics for an expert"""
+        if expert_id not in self.experts:
+            return {}
+        
+        expert = self.experts[expert_id]
+        success_rate = (
+            expert.successful_tasks / expert.total_tasks 
+            if expert.total_tasks > 0 
+            else 0.0
+        )
+        
+        return {
+            "expert_id": expert_id,
+            "name": expert.name,
+            "modality": expert.modality.value,
+            "total_tasks": expert.total_tasks,
+            "successful_tasks": expert.successful_tasks,
+            "failed_tasks": expert.failed_tasks,
+            "success_rate": success_rate,
+            "avg_completion_time": expert.avg_completion_time,
+            "expertise_level": expert.expertise_level
+        }
+    
+    def get_top_experts(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Get top performing experts by success rate and expertise"""
+        performances = [
+            self.get_expert_performance(expert_id)
+            for expert_id in self.experts.keys()
+        ]
+        
+        # Sort by success rate * expertise level
+        performances.sort(
+            key=lambda p: p.get("success_rate", 0) * p.get("expertise_level", 1),
+            reverse=True
+        )
+        
+        return performances[:limit]
     
     def _infer_modality(self, task: Dict[str, Any]) -> Optional[ExpertModality]:
         """Infer the modality needed for a task"""

@@ -81,78 +81,206 @@ class FractalAgent:
         """
         Break down a complex goal into subtasks (Auto-GPT style)
         
-        Returns list of subtask definitions that can spawn child agents
+        Enhanced with complexity analysis, dependency tracking, and smart prioritization.
+        Returns list of subtask definitions that can spawn child agents.
         """
         self.logger.info(f"Breaking down goal: {goal}")
         
-        # Simple goal decomposition - in production this would use LLM
+        # Analyze goal complexity
+        complexity_score = self._analyze_goal_complexity(goal)
+        words = goal.lower().split()
         subtasks = []
         
-        # Analyze goal complexity
-        words = goal.lower().split()
-        
+        # Enhanced: Handle compound goals with better parsing
         if "and" in words or "then" in words:
-            # Sequential tasks
+            # Sequential tasks with dependency tracking
             parts = goal.replace(" and ", " , ").replace(" then ", " , ").split(",")
             for i, part in enumerate(parts):
                 subtasks.append({
                     "goal": part.strip(),
                     "type": "sequential",
                     "priority": i,
-                    "role": self._infer_role(part.strip())
+                    "role": self._infer_role(part.strip()),
+                    "complexity": self._analyze_goal_complexity(part.strip()),
+                    "dependencies": [i - 1] if i > 0 else [],
+                    "estimated_effort": self._estimate_effort(part.strip())
                 })
-        elif any(word in words for word in ["research", "analyze", "build", "test"]):
-            # Specialized tasks
-            if "research" in words:
+        elif any(word in words for word in ["research", "analyze", "build", "test", "design", "implement", "deploy"]):
+            # Specialized tasks with proper workflow ordering
+            if "research" in words or "investigate" in words:
                 subtasks.append({
                     "goal": f"Research for: {goal}",
                     "type": "research",
                     "priority": 0,
-                    "role": "Researcher"
+                    "role": "Researcher",
+                    "complexity": min(complexity_score, 0.6),
+                    "dependencies": [],
+                    "estimated_effort": "medium"
+                })
+            if "design" in words or "plan" in words:
+                subtasks.append({
+                    "goal": f"Design: {goal}",
+                    "type": "design",
+                    "priority": 1,
+                    "role": "Designer",
+                    "complexity": complexity_score * 0.7,
+                    "dependencies": [0] if len(subtasks) > 0 else [],
+                    "estimated_effort": "medium"
                 })
             if "analyze" in words:
                 subtasks.append({
                     "goal": f"Analyze: {goal}",
                     "type": "analysis",
-                    "priority": 1,
-                    "role": "Analyst"
+                    "priority": len(subtasks),
+                    "role": "Analyst",
+                    "complexity": complexity_score * 0.6,
+                    "dependencies": list(range(len(subtasks))),
+                    "estimated_effort": "medium"
                 })
-            if "build" in words or "create" in words:
+            if "build" in words or "create" in words or "implement" in words:
                 subtasks.append({
                     "goal": f"Build: {goal}",
                     "type": "builder",
-                    "priority": 2,
-                    "role": "Builder"
+                    "priority": len(subtasks),
+                    "role": "Builder",
+                    "complexity": complexity_score * 0.9,
+                    "dependencies": list(range(len(subtasks))),
+                    "estimated_effort": "high"
                 })
-            if "test" in words or "verify" in words:
+            if "test" in words or "verify" in words or "validate" in words:
                 subtasks.append({
                     "goal": f"Test: {goal}",
                     "type": "testing",
-                    "priority": 3,
-                    "role": "Tester"
+                    "priority": len(subtasks),
+                    "role": "Tester",
+                    "complexity": complexity_score * 0.5,
+                    "dependencies": list(range(len(subtasks))),
+                    "estimated_effort": "medium"
+                })
+            if "deploy" in words or "release" in words:
+                subtasks.append({
+                    "goal": f"Deploy: {goal}",
+                    "type": "deployment",
+                    "priority": len(subtasks),
+                    "role": "DevOps",
+                    "complexity": complexity_score * 0.4,
+                    "dependencies": list(range(len(subtasks))),
+                    "estimated_effort": "low"
                 })
         else:
-            # Single complex task - create support agents
-            subtasks.append({
-                "goal": f"Execute: {goal}",
-                "type": "execution",
-                "priority": 0,
-                "role": "Executor"
-            })
+            # Single complex task - analyze if it needs breakdown
+            if complexity_score > 0.7:
+                # High complexity: break into phases
+                subtasks.extend([
+                    {
+                        "goal": f"Plan: {goal}",
+                        "type": "planning",
+                        "priority": 0,
+                        "role": "Planner",
+                        "complexity": 0.4,
+                        "dependencies": [],
+                        "estimated_effort": "low"
+                    },
+                    {
+                        "goal": f"Execute: {goal}",
+                        "type": "execution",
+                        "priority": 1,
+                        "role": "Executor",
+                        "complexity": complexity_score,
+                        "dependencies": [0],
+                        "estimated_effort": "high"
+                    },
+                    {
+                        "goal": f"Verify: {goal}",
+                        "type": "verification",
+                        "priority": 2,
+                        "role": "Verifier",
+                        "complexity": 0.3,
+                        "dependencies": [1],
+                        "estimated_effort": "low"
+                    }
+                ])
+            else:
+                # Low complexity: single task
+                subtasks.append({
+                    "goal": f"Execute: {goal}",
+                    "type": "execution",
+                    "priority": 0,
+                    "role": "Executor",
+                    "complexity": complexity_score,
+                    "dependencies": [],
+                    "estimated_effort": "low" if complexity_score < 0.3 else "medium"
+                })
         
+        self.logger.info(f"Decomposed into {len(subtasks)} subtasks with complexity {complexity_score:.2f}")
         return subtasks
     
+    def _analyze_goal_complexity(self, goal: str) -> float:
+        """
+        Analyze goal complexity using multiple heuristics
+        
+        Returns complexity score from 0.0 (simple) to 1.0 (very complex)
+        """
+        words = goal.lower().split()
+        
+        # Factors contributing to complexity
+        length_factor = min(len(words) / 20.0, 1.0)  # Longer goals = more complex
+        
+        # Technical keywords increase complexity
+        technical_keywords = [
+            "integrate", "optimize", "scale", "deploy", "architect",
+            "implement", "distributed", "concurrent", "algorithm"
+        ]
+        tech_factor = sum(1 for kw in technical_keywords if kw in words) / 5.0
+        
+        # Multiple action verbs = higher complexity
+        action_verbs = [
+            "build", "create", "design", "analyze", "test",
+            "research", "implement", "deploy", "monitor"
+        ]
+        action_factor = min(sum(1 for verb in action_verbs if verb in words) / 3.0, 1.0)
+        
+        # Compound goals (and/or/then) increase complexity
+        compound_factor = 0.3 if any(conj in words for conj in ["and", "or", "then", "after"]) else 0.0
+        
+        # Calculate weighted complexity
+        complexity = (
+            length_factor * 0.3 +
+            tech_factor * 0.3 +
+            action_factor * 0.2 +
+            compound_factor * 0.2
+        )
+        
+        return min(max(complexity, 0.1), 1.0)  # Clamp between 0.1 and 1.0
+    
+    def _estimate_effort(self, goal: str) -> str:
+        """Estimate effort level for a goal"""
+        complexity = self._analyze_goal_complexity(goal)
+        
+        if complexity < 0.3:
+            return "low"
+        elif complexity < 0.7:
+            return "medium"
+        else:
+            return "high"
+    
     def _infer_role(self, task: str) -> str:
-        """Infer agent role from task description"""
+        """Infer agent role from task description with expanded role types"""
         task_lower = task.lower()
         
         role_keywords = {
-            "Researcher": ["research", "investigate", "find", "search"],
-            "Analyst": ["analyze", "evaluate", "assess", "review"],
-            "Builder": ["build", "create", "develop", "implement"],
-            "Tester": ["test", "verify", "validate", "check"],
-            "Writer": ["write", "document", "describe", "explain"],
-            "Coordinator": ["coordinate", "manage", "organize", "plan"]
+            "Researcher": ["research", "investigate", "find", "search", "explore", "discover"],
+            "Analyst": ["analyze", "evaluate", "assess", "review", "examine", "study"],
+            "Builder": ["build", "create", "develop", "construct", "code", "program"],
+            "Implementer": ["implement", "execute", "apply", "deploy"],
+            "Designer": ["design", "architect", "model", "structure", "blueprint"],
+            "Tester": ["test", "verify", "validate", "check", "qa", "quality"],
+            "DevOps": ["deploy", "release", "launch", "publish", "ship"],
+            "Planner": ["plan", "strategize", "roadmap", "schedule"],
+            "Verifier": ["verify", "confirm", "ensure", "guarantee"],
+            "Writer": ["write", "document", "describe", "explain", "annotate"],
+            "Coordinator": ["coordinate", "manage", "organize", "orchestrate", "supervise"],
+            "Optimizer": ["optimize", "improve", "enhance", "refine", "tune"]
         }
         
         for role, keywords in role_keywords.items():
@@ -201,16 +329,20 @@ class FractalAgent:
         return child
     
     def _inherit_capabilities(self, task_type: str) -> List[str]:
-        """Inherit and specialize capabilities based on task type"""
+        """Inherit and specialize capabilities based on task type - expanded with new types"""
         base_capabilities = ["communicate", "delegate", "report"]
         
         type_capabilities = {
-            "research": ["search", "gather", "synthesize"],
-            "analysis": ["analyze", "evaluate", "compare"],
-            "builder": ["design", "implement", "integrate"],
-            "testing": ["test", "validate", "debug"],
-            "sequential": ["coordinate", "sequence", "monitor"],
-            "execution": ["execute", "optimize", "adapt"]
+            "research": ["search", "gather", "synthesize", "investigate"],
+            "analysis": ["analyze", "evaluate", "compare", "interpret"],
+            "builder": ["design", "implement", "integrate", "construct"],
+            "testing": ["test", "validate", "debug", "qa"],
+            "sequential": ["coordinate", "sequence", "monitor", "track"],
+            "execution": ["execute", "optimize", "adapt", "perform"],
+            "planning": ["plan", "strategize", "schedule", "prioritize"],
+            "design": ["architect", "model", "blueprint", "structure"],
+            "deployment": ["deploy", "release", "monitor", "rollback"],
+            "verification": ["verify", "confirm", "audit", "certify"]
         }
         
         return base_capabilities + type_capabilities.get(task_type, [])

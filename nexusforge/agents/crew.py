@@ -11,7 +11,7 @@ from enum import Enum
 
 
 class CrewRole(Enum):
-    """Standard crew roles"""
+    """Standard crew roles - expanded"""
     LEADER = "leader"
     RESEARCHER = "researcher"
     ANALYST = "analyst"
@@ -19,6 +19,18 @@ class CrewRole(Enum):
     TESTER = "tester"
     COORDINATOR = "coordinator"
     SPECIALIST = "specialist"
+    DESIGNER = "designer"  # New
+    OPTIMIZER = "optimizer"  # New
+    MONITOR = "monitor"  # New
+
+
+class WorkflowPattern(Enum):
+    """Workflow execution patterns for crews"""
+    SEQUENTIAL = "sequential"  # Tasks run one after another
+    PARALLEL = "parallel"  # All tasks run simultaneously
+    PIPELINE = "pipeline"  # Output of one feeds into next
+    MAP_REDUCE = "map_reduce"  # Distribute work, then aggregate
+    HIERARCHICAL = "hierarchical"  # Tree-like delegation
 
 
 @dataclass
@@ -32,7 +44,7 @@ class CrewMember:
 
 @dataclass
 class Crew:
-    """A crew of agents working together"""
+    """A crew of agents working together with workflow support"""
     crew_id: str
     name: str
     leader_id: Optional[str]
@@ -40,6 +52,9 @@ class Crew:
     goals: List[str] = field(default_factory=list)
     status: str = "forming"  # forming, active, paused, completed
     metadata: Dict[str, Any] = field(default_factory=dict)
+    workflow_pattern: WorkflowPattern = WorkflowPattern.SEQUENTIAL  # New
+    task_queue: List[Dict[str, Any]] = field(default_factory=list)  # New: pending tasks
+    completed_tasks: List[str] = field(default_factory=list)  # New: track completion
 
 
 class CrewManager:
@@ -60,9 +75,10 @@ class CrewManager:
         self,
         name: str,
         leader_id: Optional[str] = None,
-        goals: Optional[List[str]] = None
+        goals: Optional[List[str]] = None,
+        workflow_pattern: WorkflowPattern = WorkflowPattern.SEQUENTIAL
     ) -> str:
-        """Create a new crew"""
+        """Create a new crew with specified workflow pattern"""
         import uuid
         crew_id = str(uuid.uuid4())
         
@@ -70,7 +86,8 @@ class CrewManager:
             crew_id=crew_id,
             name=name,
             leader_id=leader_id,
-            goals=goals or []
+            goals=goals or [],
+            workflow_pattern=workflow_pattern
         )
         
         self.crews[crew_id] = crew
@@ -78,7 +95,9 @@ class CrewManager:
         if leader_id:
             self._add_agent_to_crew_tracking(leader_id, crew_id)
         
-        self.logger.info(f"Created crew: {name} ({crew_id})")
+        self.logger.info(
+            f"Created crew: {name} ({crew_id}) with {workflow_pattern.value} workflow"
+        )
         return crew_id
     
     def add_member(
@@ -174,3 +193,159 @@ class CrewManager:
     def get_all_crews(self) -> List[Crew]:
         """Get all crews"""
         return list(self.crews.values())
+    
+    async def assign_task_to_crew(
+        self,
+        crew_id: str,
+        task: Dict[str, Any],
+        from_agent: Optional[str] = None
+    ):
+        """
+        Assign a task to a crew, will be distributed based on workflow pattern
+        """
+        if crew_id not in self.crews:
+            self.logger.error(f"Crew {crew_id} not found")
+            return
+        
+        crew = self.crews[crew_id]
+        crew.task_queue.append(task)
+        
+        self.logger.info(f"Task assigned to crew {crew_id}: {task.get('description', 'Unnamed task')}")
+        
+        # Execute based on workflow pattern
+        await self._execute_crew_workflow(crew_id, task)
+    
+    async def _execute_crew_workflow(self, crew_id: str, task: Dict[str, Any]):
+        """Execute task based on crew's workflow pattern"""
+        crew = self.crews[crew_id]
+        
+        if crew.workflow_pattern == WorkflowPattern.SEQUENTIAL:
+            await self._execute_sequential(crew, task)
+        elif crew.workflow_pattern == WorkflowPattern.PARALLEL:
+            await self._execute_parallel(crew, task)
+        elif crew.workflow_pattern == WorkflowPattern.PIPELINE:
+            await self._execute_pipeline(crew, task)
+        elif crew.workflow_pattern == WorkflowPattern.MAP_REDUCE:
+            await self._execute_map_reduce(crew, task)
+        elif crew.workflow_pattern == WorkflowPattern.HIERARCHICAL:
+            await self._execute_hierarchical(crew, task)
+    
+    async def _execute_sequential(self, crew: Crew, task: Dict[str, Any]):
+        """Execute task sequentially through crew members"""
+        self.logger.info(f"Executing sequential workflow for crew {crew.crew_id}")
+        
+        # Assign to members in order of their roles
+        for i, member in enumerate(crew.members):
+            if member.active:
+                subtask = {
+                    **task,
+                    "phase": i,
+                    "total_phases": len(crew.members),
+                    "previous_member": crew.members[i-1].agent_id if i > 0 else None
+                }
+                
+                await self.communication_hub.delegate_task(
+                    from_agent=crew.leader_id or "crew_manager",
+                    to_agent=member.agent_id,
+                    task=subtask
+                )
+    
+    async def _execute_parallel(self, crew: Crew, task: Dict[str, Any]):
+        """Execute task in parallel across all crew members"""
+        self.logger.info(f"Executing parallel workflow for crew {crew.crew_id}")
+        
+        # Distribute to all active members simultaneously
+        for member in crew.members:
+            if member.active:
+                await self.communication_hub.delegate_task(
+                    from_agent=crew.leader_id or "crew_manager",
+                    to_agent=member.agent_id,
+                    task=task
+                )
+    
+    async def _execute_pipeline(self, crew: Crew, task: Dict[str, Any]):
+        """Execute as pipeline where output feeds to next stage"""
+        self.logger.info(f"Executing pipeline workflow for crew {crew.crew_id}")
+        
+        # Similar to sequential but with explicit data passing
+        # First member gets the task
+        if crew.members and crew.members[0].active:
+            pipeline_task = {
+                **task,
+                "pipeline_stage": 0,
+                "total_stages": len(crew.members),
+                "next_agent": crew.members[1].agent_id if len(crew.members) > 1 else None
+            }
+            
+            await self.communication_hub.delegate_task(
+                from_agent=crew.leader_id or "crew_manager",
+                to_agent=crew.members[0].agent_id,
+                task=pipeline_task
+            )
+    
+    async def _execute_map_reduce(self, crew: Crew, task: Dict[str, Any]):
+        """Map work to workers, then reduce results with leader"""
+        self.logger.info(f"Executing map-reduce workflow for crew {crew.crew_id}")
+        
+        # Map phase: distribute to non-leader members
+        workers = [m for m in crew.members if m.agent_id != crew.leader_id and m.active]
+        
+        for i, member in enumerate(workers):
+            map_task = {
+                **task,
+                "map_partition": i,
+                "total_partitions": len(workers),
+                "reduce_to": crew.leader_id
+            }
+            
+            await self.communication_hub.delegate_task(
+                from_agent=crew.leader_id or "crew_manager",
+                to_agent=member.agent_id,
+                task=map_task
+            )
+    
+    async def _execute_hierarchical(self, crew: Crew, task: Dict[str, Any]):
+        """Hierarchical delegation from leader down"""
+        self.logger.info(f"Executing hierarchical workflow for crew {crew.crew_id}")
+        
+        # Leader receives task and delegates to subordinates
+        if crew.leader_id:
+            hierarchical_task = {
+                **task,
+                "delegation_level": 0,
+                "subordinates": [m.agent_id for m in crew.members if m.agent_id != crew.leader_id]
+            }
+            
+            await self.communication_hub.delegate_task(
+                from_agent="crew_manager",
+                to_agent=crew.leader_id,
+                task=hierarchical_task
+            )
+    
+    def mark_task_complete(self, crew_id: str, task_id: str):
+        """Mark a task as completed"""
+        if crew_id in self.crews:
+            crew = self.crews[crew_id]
+            if task_id not in crew.completed_tasks:
+                crew.completed_tasks.append(task_id)
+                self.logger.info(f"Task {task_id} completed in crew {crew_id}")
+    
+    def get_crew_statistics(self, crew_id: str) -> Dict[str, Any]:
+        """Get statistics for a crew"""
+        if crew_id not in self.crews:
+            return {}
+        
+        crew = self.crews[crew_id]
+        active_members = sum(1 for m in crew.members if m.active)
+        
+        return {
+            "crew_id": crew_id,
+            "name": crew.name,
+            "status": crew.status,
+            "workflow_pattern": crew.workflow_pattern.value,
+            "total_members": len(crew.members),
+            "active_members": active_members,
+            "pending_tasks": len(crew.task_queue),
+            "completed_tasks": len(crew.completed_tasks),
+            "goals": len(crew.goals)
+        }
