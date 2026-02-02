@@ -146,21 +146,35 @@ class NexusForge:
         agent_ids: List[str],
         roles: List[CrewRole],
         leader_id: Optional[str] = None,
-        goals: Optional[List[str]] = None
+        goals: Optional[List[str]] = None,
+        workflow_pattern = None  # Import will be added
     ) -> str:
-        """Create a crew from existing agents"""
+        """Create a crew from existing agents with workflow pattern"""
         if len(agent_ids) != len(roles):
             raise ValueError("Number of agents must match number of roles")
         
-        # Create crew
-        crew_id = self.crew_manager.create_crew(name, leader_id, goals)
+        # Import here to avoid circular import
+        from nexusforge.agents.crew import WorkflowPattern
+        if workflow_pattern is None:
+            workflow_pattern = WorkflowPattern.SEQUENTIAL
+        
+        # Create crew with workflow
+        crew_id = self.crew_manager.create_crew(
+            name, 
+            leader_id, 
+            goals,
+            workflow_pattern=workflow_pattern
+        )
         
         # Add members
         for agent_id, role in zip(agent_ids, roles):
             if agent_id in self.agents:
                 self.crew_manager.add_member(crew_id, agent_id, role)
         
-        self.logger.info(f"Created crew: {name} with {len(agent_ids)} members")
+        self.logger.info(
+            f"Created crew: {name} with {len(agent_ids)} members "
+            f"using {workflow_pattern.value} workflow"
+        )
         return crew_id
     
     async def send_message(
@@ -226,13 +240,17 @@ class NexusForge:
         self.logger.info("NexusForge system stopped")
     
     def get_statistics(self) -> Dict[str, Any]:
-        """Get detailed system statistics"""
+        """Get detailed system statistics with enhanced metrics"""
         agent_stats = {
             "total": len(self.agents),
             "by_depth": {},
             "by_role": {},
-            "by_status": self._get_agents_by_status()
+            "by_status": self._get_agents_by_status(),
+            "top_performers": []  # New
         }
+        
+        # Collect performance data
+        agent_performances = []
         
         for agent in self.agents.values():
             # Count by depth
@@ -242,23 +260,105 @@ class NexusForge:
             # Count by role
             role = agent.state.role
             agent_stats["by_role"][role] = agent_stats["by_role"].get(role, 0) + 1
+            
+            # Collect performance metrics
+            agent_performances.append(agent.get_performance_metrics())
+        
+        # Get top 5 performers
+        agent_performances.sort(
+            key=lambda x: x.get("performance_score", 0) * x.get("success_rate", 0),
+            reverse=True
+        )
+        agent_stats["top_performers"] = agent_performances[:5]
         
         return {
             "system_status": self.get_system_status(),
             "agent_stats": agent_stats,
             "crew_stats": {
                 "total": len(self.crew_manager.get_all_crews()),
-                "active": len([c for c in self.crew_manager.get_all_crews() if c.status == "active"])
+                "active": len([c for c in self.crew_manager.get_all_crews() if c.status == "active"]),
+                "by_workflow": self._get_crews_by_workflow()  # New
             },
             "expert_stats": {
                 "total": len(self.expert_system.get_all_experts()),
                 "by_modality": {
                     modality.value: len(expert_ids)
                     for modality, expert_ids in self.expert_system.modality_experts.items()
-                }
+                },
+                "top_experts": self.expert_system.get_top_experts(5)  # New
             },
             "communication_stats": {
                 "total_messages": len(self.communication_hub.message_history),
-                "conversations": len(self.communication_hub.conversations)
+                "conversations": len(self.communication_hub.conversations),
+                "pending_messages": len(self.communication_hub._pending_messages)  # New
             }
         }
+    
+    def _get_crews_by_workflow(self) -> Dict[str, int]:
+        """Count crews by workflow pattern"""
+        workflow_counts = {}
+        for crew in self.crew_manager.get_all_crews():
+            pattern = crew.workflow_pattern.value
+            workflow_counts[pattern] = workflow_counts.get(pattern, 0) + 1
+        return workflow_counts
+    
+    def get_agent_performance(self, agent_id: str) -> Dict[str, Any]:
+        """Get performance metrics for a specific agent"""
+        agent = self.agents.get(agent_id)
+        return agent.get_performance_metrics() if agent else {}
+    
+    def get_top_performing_agents(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get top performing agents by performance score and success rate"""
+        performances = [
+            agent.get_performance_metrics()
+            for agent in self.agents.values()
+        ]
+        
+        performances.sort(
+            key=lambda x: x.get("performance_score", 0) * x.get("success_rate", 0),
+            reverse=True
+        )
+        
+        return performances[:limit]
+    
+    async def send_priority_message(
+        self,
+        from_agent: str,
+        to_agent: str,
+        message: str,
+        priority: str = "NORMAL"
+    ) -> str:
+        """Send a message with specific priority level"""
+        from nexusforge.communication.hub import MessagePriority, MessageType
+        
+        priority_map = {
+            "LOW": MessagePriority.LOW,
+            "NORMAL": MessagePriority.NORMAL,
+            "HIGH": MessagePriority.HIGH,
+            "URGENT": MessagePriority.URGENT
+        }
+        
+        return await self.communication_hub.send_message(
+            from_agent=from_agent,
+            to_agent=to_agent,
+            message_type=MessageType.CHAT,
+            content=message,
+            priority=priority_map.get(priority, MessagePriority.NORMAL)
+        )
+    
+    def record_expert_task_result(self, expert_id: str, task_id: str, 
+                                  success: bool, completion_time: float,
+                                  confidence_score: float = 1.0):
+        """Record the result of a task executed by an expert"""
+        from nexusforge.agents.experts import TaskResult
+        
+        result = TaskResult(
+            task_id=task_id,
+            expert_id=expert_id,
+            success=success,
+            completion_time=completion_time,
+            confidence_score=confidence_score
+        )
+        
+        self.expert_system.record_task_result(result)
+        self.logger.info(f"Recorded task result for expert {expert_id}: {'success' if success else 'failure'}")

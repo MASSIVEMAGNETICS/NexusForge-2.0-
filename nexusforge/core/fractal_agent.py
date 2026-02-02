@@ -27,7 +27,7 @@ class AgentTemplate:
 
 @dataclass
 class AgentState:
-    """State of an agent in the hierarchy"""
+    """State of an agent in the hierarchy with enhanced tracking"""
     agent_id: str
     name: str
     role: str
@@ -35,9 +35,17 @@ class AgentState:
     parent_id: Optional[str]
     children: List[str] = field(default_factory=list)
     goals: List[str] = field(default_factory=list)
-    status: str = "active"  # active, idle, completed, failed
+    status: str = "active"  # active, idle, completed, failed, blocked, queued
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Enhanced state tracking
+    tasks_completed: int = 0
+    tasks_failed: int = 0
+    total_execution_time: float = 0.0
+    last_activity: datetime = field(default_factory=datetime.now)
+    performance_score: float = 1.0  # 0.0 to 2.0, starts at 1.0
+    current_task: Optional[str] = None
+    message_count: int = 0
 
 
 class FractalAgent:
@@ -269,13 +277,13 @@ class FractalAgent:
         task_lower = task.lower()
         
         role_keywords = {
+            "DevOps": ["deploy", "release", "launch", "publish", "ship"],
             "Researcher": ["research", "investigate", "find", "search", "explore", "discover"],
             "Analyst": ["analyze", "evaluate", "assess", "review", "examine", "study"],
             "Builder": ["build", "create", "develop", "construct", "code", "program"],
-            "Implementer": ["implement", "execute", "apply", "deploy"],
+            "Implementer": ["implement", "execute", "apply"],
             "Designer": ["design", "architect", "model", "structure", "blueprint"],
             "Tester": ["test", "verify", "validate", "check", "qa", "quality"],
-            "DevOps": ["deploy", "release", "launch", "publish", "ship"],
             "Planner": ["plan", "strategize", "roadmap", "schedule"],
             "Verifier": ["verify", "confirm", "ensure", "guarantee"],
             "Writer": ["write", "document", "describe", "explain", "annotate"],
@@ -415,6 +423,66 @@ class FractalAgent:
         }
     
     def set_status(self, status: str):
-        """Update agent status"""
+        """Update agent status with activity tracking"""
         self.state.status = status
+        self.state.last_activity = datetime.now()
         self.logger.info(f"Status changed to: {status}")
+    
+    def record_task_completion(self, success: bool, execution_time: float = 0.0):
+        """
+        Record task completion to update performance metrics
+        """
+        if success:
+            self.state.tasks_completed += 1
+            # Increase performance score on success (up to 2.0)
+            self.state.performance_score = min(2.0, self.state.performance_score + 0.02)
+        else:
+            self.state.tasks_failed += 1
+            # Decrease performance score on failure (down to 0.5)
+            self.state.performance_score = max(0.5, self.state.performance_score - 0.05)
+        
+        self.state.total_execution_time += execution_time
+        self.state.last_activity = datetime.now()
+        
+        self.logger.info(
+            f"Task {'completed' if success else 'failed'}. "
+            f"Performance: {self.state.performance_score:.2f}, "
+            f"Success rate: {self.get_success_rate():.1%}"
+        )
+    
+    def get_success_rate(self) -> float:
+        """Calculate success rate for this agent"""
+        total = self.state.tasks_completed + self.state.tasks_failed
+        return self.state.tasks_completed / total if total > 0 else 1.0
+    
+    def get_avg_execution_time(self) -> float:
+        """Get average execution time per task"""
+        total_tasks = self.state.tasks_completed + self.state.tasks_failed
+        return self.state.total_execution_time / total_tasks if total_tasks > 0 else 0.0
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get comprehensive performance metrics for this agent"""
+        total_tasks = self.state.tasks_completed + self.state.tasks_failed
+        uptime = (datetime.now() - self.state.created_at).total_seconds()
+        
+        return {
+            "agent_id": self.agent_id,
+            "name": self.state.name,
+            "role": self.state.role,
+            "status": self.state.status,
+            "performance_score": self.state.performance_score,
+            "tasks_completed": self.state.tasks_completed,
+            "tasks_failed": self.state.tasks_failed,
+            "success_rate": self.get_success_rate(),
+            "avg_execution_time": self.get_avg_execution_time(),
+            "total_tasks": total_tasks,
+            "uptime_seconds": uptime,
+            "message_count": self.state.message_count,
+            "last_activity": self.state.last_activity.isoformat(),
+            "children_count": len(self.children)
+        }
+    
+    def increment_message_count(self):
+        """Track message activity"""
+        self.state.message_count += 1
+        self.state.last_activity = datetime.now()
