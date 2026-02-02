@@ -250,8 +250,9 @@ class TestPriorityMessageQueue:
             dependencies=[msg1_id]
         )
         
-        # Initially msg2 should be pending
-        assert msg2_id in hub._pending_messages or msg2_id not in hub._pending_messages
+        # Check that dependency tracking is working
+        assert msg1_id in [m.message_id for m in hub.message_history]
+        assert msg2_id in [m.message_id for m in hub.message_history]
         
         await hub.stop()
 

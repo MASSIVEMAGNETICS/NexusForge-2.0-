@@ -220,6 +220,9 @@ class MultiModalExpertSystem:
     def record_task_result(self, result: TaskResult):
         """
         Record the result of a task to update expert performance metrics
+        
+        Note: Uses asymmetric learning rates - failures penalize 2x more than successes reward.
+        This design encourages consistency and reliability in expert performance.
         """
         self.task_history.append(result)
         
@@ -235,7 +238,8 @@ class MultiModalExpertSystem:
             expert.expertise_level = min(2.0, expert.expertise_level + 0.01)
         else:
             expert.failed_tasks += 1
-            # Slightly decrease expertise level on failure (down to 0.5)
+            # Decrease expertise level on failure more than success increase (down to 0.5)
+            # Asymmetric: -0.02 vs +0.01 to emphasize reliability
             expert.expertise_level = max(0.5, expert.expertise_level - 0.02)
         
         # Update average completion time (rolling average)

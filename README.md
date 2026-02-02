@@ -1,6 +1,6 @@
 # 🚀 NexusForge 2.0
 
-**AGI-lite Autonomous Agent Framework**
+**AGI-lite Autonomous Agent Framework - Now Enhanced with Intelligence & Performance Tracking**
 
 NexusForge 2.0 fuses FractalAgentForge's recursive templates with Auto-GPT's goal-breaking, BabyAGI's self-building functions, SuperAGI's production GUI, JARVIS's multi-modal experts, AutoGen's agent chats, and CrewAI's role crews. Bootstrap from a goal: spawn fractal hierarchies that converse, delegate, and evolve via dashboards and triggers—no deps, Docker-ready.
 
@@ -8,15 +8,25 @@ From R&D swarms to viral apps, it's AGI-lite autonomy in ~600MB. Open-source the
 
 ## ✨ Features
 
+### Core Features
 - **🌳 Fractal Agent Hierarchies**: Recursive agent spawning with depth control (FractalAgentForge-inspired)
-- **🎯 Goal Decomposition**: Automatic task breaking and subtask delegation (Auto-GPT-style)
+- **🎯 Enhanced Goal Decomposition**: Automatic task breaking with complexity analysis and dependency tracking (Auto-GPT-style)
 - **🔧 Self-Building Functions**: Agents dynamically register new capabilities (BabyAGI-inspired)
-- **💬 Agent Conversations**: Multi-agent communication and collaboration (AutoGen-style)
-- **👥 Role-Based Crews**: Organize agents into specialized teams (CrewAI-inspired)
-- **🎓 Multi-Modal Experts**: Specialized experts for different domains (JARVIS-inspired)
+- **💬 Priority-Based Communication**: Multi-agent communication with intelligent message queuing (AutoGen-style)
+- **👥 Advanced Crew Workflows**: Organize agents with 5 workflow patterns (SEQUENTIAL, PARALLEL, PIPELINE, MAP_REDUCE, HIERARCHICAL)
+- **🎓 Self-Improving Experts**: Multi-modal experts that learn from experience and track performance (JARVIS-inspired)
 - **🖥️ Production Dashboard**: Real-time monitoring and control GUI (SuperAGI-style)
 - **🐳 Docker Ready**: Containerized deployment with minimal dependencies
 - **⚡ Bootstrap from Goals**: Start with a high-level objective, let agents handle the rest
+
+### 🆕 Recent Enhancements
+- **📊 Performance Tracking**: Agents and experts track success rates, execution times, and self-optimize
+- **🧠 Complexity Analysis**: Smart goal decomposition based on complexity scoring
+- **🚦 Priority Queuing**: Messages delivered by priority with dependency resolution
+- **📈 Advanced Analytics**: Top performer tracking and comprehensive system statistics
+- **🔄 Workflow Patterns**: Five sophisticated crew coordination patterns
+
+See [ENHANCEMENTS.md](docs/ENHANCEMENTS.md) for detailed documentation.
 
 ## 🏗️ Architecture
 

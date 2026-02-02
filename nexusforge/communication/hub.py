@@ -23,7 +23,6 @@ class MessageType(Enum):
     DELEGATION = "delegation"
     STATUS = "status"
     BROADCAST = "broadcast"
-    URGENT = "urgent"  # New: high priority messages
 
 
 class MessagePriority(Enum):

@@ -35,7 +35,7 @@ class AgentState:
     parent_id: Optional[str]
     children: List[str] = field(default_factory=list)
     goals: List[str] = field(default_factory=list)
-    status: str = "active"  # active, idle, completed, failed, blocked, queued
+    status: str = "active"  # active, idle, completed, failed
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
     # Enhanced state tracking
@@ -431,6 +431,9 @@ class FractalAgent:
     def record_task_completion(self, success: bool, execution_time: float = 0.0):
         """
         Record task completion to update performance metrics
+        
+        Note: Uses asymmetric learning rates - failures penalize 2.5x more than successes reward.
+        This design encourages reliability and penalizes errors more heavily to drive improvement.
         """
         if success:
             self.state.tasks_completed += 1
@@ -438,7 +441,8 @@ class FractalAgent:
             self.state.performance_score = min(2.0, self.state.performance_score + 0.02)
         else:
             self.state.tasks_failed += 1
-            # Decrease performance score on failure (down to 0.5)
+            # Decrease performance score on failure more than success increase (down to 0.5)
+            # Asymmetric: -0.05 vs +0.02 to emphasize reliability
             self.state.performance_score = max(0.5, self.state.performance_score - 0.05)
         
         self.state.total_execution_time += execution_time
