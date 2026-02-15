@@ -37,7 +37,7 @@ class ExpertProfile:
     successful_tasks: int = 0
     failed_tasks: int = 0
     avg_completion_time: float = 0.0
-    expertise_level: float = 1.0  # 0.0 to 2.0, starts at 1.0
+    expertise_level: float = 1.0  # 0.5 to 2.0, starts at 1.0
 
 
 @dataclass
