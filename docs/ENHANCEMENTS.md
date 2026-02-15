@@ -153,7 +153,7 @@ msg1_id = await hub.send_message(
     content="Start task"
 )
 
-# Send dependent message (won't deliver until msg1 is processed)
+# Send dependent message (won't deliver until msg1 is delivered)
 msg2_id = await hub.send_message(
     from_agent="agent1",
     to_agent="agent2",

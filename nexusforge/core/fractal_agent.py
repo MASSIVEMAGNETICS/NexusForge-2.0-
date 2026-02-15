@@ -227,7 +227,7 @@ class FractalAgent:
         """
         Analyze goal complexity using multiple heuristics
         
-        Returns complexity score from 0.0 (simple) to 1.0 (very complex)
+        Returns complexity score from 0.1 (simple) to 1.0 (very complex)
         """
         words = goal.lower().split()
         

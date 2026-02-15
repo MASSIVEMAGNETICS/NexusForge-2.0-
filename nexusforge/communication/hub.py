@@ -77,6 +77,7 @@ class CommunicationHub:
         self._running = False
         self._message_dependencies: Dict[str, List[str]] = {}  # Track dependencies
         self._pending_messages: Dict[str, Message] = {}  # Messages waiting for dependencies
+        self._delivered_message_ids: set = set()  # Track which messages have been delivered
         
     def register_agent(self, agent_id: str, agent: Any):
         """Register an agent with the communication hub"""
@@ -131,9 +132,9 @@ class CommunicationHub:
         
         # Check dependencies
         if dependencies and not self._dependencies_satisfied(dependencies):
-            # Store pending message
+            # Store pending message with a copy of dependencies to avoid mutation
             self._pending_messages[message_id] = message
-            self._message_dependencies[message_id] = dependencies
+            self._message_dependencies[message_id] = list(dependencies)  # Store copy
             self.logger.debug(f"Message {message_id} pending dependencies: {dependencies}")
             return message_id
         
@@ -146,12 +147,11 @@ class CommunicationHub:
         return message_id
     
     def _dependencies_satisfied(self, dependencies: List[str]) -> bool:
-        """Check if all message dependencies are satisfied"""
-        return all(dep_id in [m.message_id for m in self.message_history] 
-                   for dep_id in dependencies)
+        """Check if all message dependencies are satisfied (delivered)"""
+        return all(dep_id in self._delivered_message_ids for dep_id in dependencies)
     
     async def _deliver_message(self, message: Message):
-        """Deliver a message to target agent(s)"""
+        """Deliver a message to target agent(s) and mark as delivered"""
         if message.to_agent:
             # Direct message - use priority queue
             if message.to_agent in self.message_queues:
@@ -168,6 +168,9 @@ class CommunicationHub:
                 if agent_id != message.from_agent:
                     heapq.heappush(queue, message)
             self.logger.debug(f"Message {message.message_id} broadcast to all agents")
+        
+        # Mark message as delivered
+        self._delivered_message_ids.add(message.message_id)
         
         # Trigger handlers
         for handler in self.handlers[message.message_type]:

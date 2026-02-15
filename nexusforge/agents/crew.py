@@ -213,7 +213,12 @@ class CrewManager:
         self.logger.info(f"Task assigned to crew {crew_id}: {task.get('description', 'Unnamed task')}")
         
         # Execute based on workflow pattern
-        await self._execute_crew_workflow(crew_id, task)
+        try:
+            await self._execute_crew_workflow(crew_id, task)
+        finally:
+            # Remove task from queue after execution to maintain accurate pending count
+            if task in crew.task_queue:
+                crew.task_queue.remove(task)
     
     async def _execute_crew_workflow(self, crew_id: str, task: Dict[str, Any]):
         """Execute task based on crew's workflow pattern"""
