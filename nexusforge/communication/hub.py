@@ -6,7 +6,7 @@ Implements AutoGen-style agent chat and message passing between agents.
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -77,7 +77,7 @@ class CommunicationHub:
         self._running = False
         self._message_dependencies: Dict[str, List[str]] = {}  # Track dependencies
         self._pending_messages: Dict[str, Message] = {}  # Messages waiting for dependencies
-        self._delivered_message_ids: set = set()  # Track which messages have been delivered
+        self._delivered_message_ids: Set[str] = set()  # Track which messages have been delivered
         
     def register_agent(self, agent_id: str, agent: Any):
         """Register an agent with the communication hub"""

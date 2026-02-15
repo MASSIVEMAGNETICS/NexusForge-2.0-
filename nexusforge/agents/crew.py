@@ -217,8 +217,10 @@ class CrewManager:
             await self._execute_crew_workflow(crew_id, task)
         finally:
             # Remove task from queue after execution to maintain accurate pending count
-            if task in crew.task_queue:
+            try:
                 crew.task_queue.remove(task)
+            except ValueError:
+                pass  # Task already removed or not in queue
     
     async def _execute_crew_workflow(self, crew_id: str, task: Dict[str, Any]):
         """Execute task based on crew's workflow pattern"""
