@@ -182,13 +182,15 @@ class CommunicationHub:
         
         for msg_id, dependencies in list(self._message_dependencies.items()):
             if satisfied_message_id in dependencies:
-                # Update dependencies
-                dependencies.remove(satisfied_message_id)
+                # Recompute dependencies without mutating the original list in-place
+                remaining_dependencies = [dep for dep in dependencies if dep != satisfied_message_id]
                 
                 # If all dependencies satisfied, deliver
-                if not dependencies:
+                if not remaining_dependencies:
                     messages_to_deliver.append(msg_id)
                     del self._message_dependencies[msg_id]
+                else:
+                    self._message_dependencies[msg_id] = remaining_dependencies
         
         # Deliver messages whose dependencies are now satisfied
         for msg_id in messages_to_deliver:
