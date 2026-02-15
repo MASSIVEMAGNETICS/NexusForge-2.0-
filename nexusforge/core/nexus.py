@@ -290,7 +290,7 @@ class NexusForge:
             "communication_stats": {
                 "total_messages": len(self.communication_hub.message_history),
                 "conversations": len(self.communication_hub.conversations),
-                "pending_messages": len(self.communication_hub._pending_messages)  # New
+                "pending_messages": self.communication_hub.get_pending_message_count()  # New
             }
         }
     

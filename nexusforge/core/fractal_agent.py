@@ -43,7 +43,7 @@ class AgentState:
     tasks_failed: int = 0
     total_execution_time: float = 0.0
     last_activity: datetime = field(default_factory=datetime.now)
-    performance_score: float = 1.0  # 0.0 to 2.0, starts at 1.0
+    performance_score: float = 1.0  # 0.5 to 2.0, starts at 1.0
     current_task: Optional[str] = None
     message_count: int = 0
 

@@ -301,6 +301,10 @@ class CommunicationHub:
             if msg.from_agent == agent_id or msg.to_agent == agent_id
         ]
     
+    def get_pending_message_count(self) -> int:
+        """Get the count of messages waiting for dependencies to be satisfied"""
+        return len(self._pending_messages)
+    
     async def start(self):
         """Start the communication hub"""
         self._running = True
