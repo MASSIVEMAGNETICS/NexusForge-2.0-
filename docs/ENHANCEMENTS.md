@@ -386,7 +386,7 @@ Get average execution time per task.
 Get comprehensive performance metrics.
 
 #### `_analyze_goal_complexity(goal: str) -> float`
-Analyze goal complexity (0.0 to 1.0 scale).
+Analyze goal complexity (0.1 to 1.0 scale).
 
 ### MultiModalExpertSystem
 
