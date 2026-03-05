@@ -15,7 +15,7 @@ The goal decomposition system has been significantly upgraded from simple keywor
 ### Key Features
 
 #### Goal Complexity Analysis
-- **Automatic complexity scoring** (0.0 to 1.0 scale)
+- **Automatic complexity scoring** (0.1 to 1.0 scale)
 - Considers multiple factors:
   - Goal length and structure
   - Technical keywords
