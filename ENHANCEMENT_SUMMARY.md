@@ -14,7 +14,7 @@ Successfully enhanced and upgraded NexusForge 2.0 with intelligent systems, perf
 - **Before**: Simple keyword matching for task breakdown
 - **After**: Sophisticated complexity analysis with dependency tracking
 - **Key Features**:
-  - Goal complexity scoring (0.0-1.0 scale)
+  - Goal complexity scoring (0.1-1.0 scale)
   - Automatic effort estimation (low/medium/high)
   - Dependency tracking between subtasks
   - Expanded role detection (+6 new roles: Designer, Planner, Optimizer, DevOps, Verifier, Implementer)
