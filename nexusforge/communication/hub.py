@@ -214,8 +214,8 @@ class CommunicationHub:
         queue = self.message_queues[agent_id]
         
         # Wait for message up to timeout duration
-        start_time = asyncio.get_event_loop().time()
-        poll_interval = 0.1
+        start_time = asyncio.get_running_loop().time()
+        poll_interval = 0.1  # Re-check queue every 100ms
         
         while True:
             # Check if message is available
@@ -229,7 +229,7 @@ class CommunicationHub:
                 return message
             
             # Check if timeout expired
-            elapsed = asyncio.get_event_loop().time() - start_time
+            elapsed = asyncio.get_running_loop().time() - start_time
             if elapsed >= timeout:
                 return None
             
