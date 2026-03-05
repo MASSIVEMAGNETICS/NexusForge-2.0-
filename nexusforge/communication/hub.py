@@ -206,24 +206,35 @@ class CommunicationHub:
     async def receive_message(self, agent_id: str, timeout: float = 1.0) -> Optional[Message]:
         """
         Receive highest priority message for an agent (non-blocking with timeout)
+        Waits up to timeout seconds for a message to arrive, re-checking the queue periodically.
         """
         if agent_id not in self.message_queues:
             return None
         
         queue = self.message_queues[agent_id]
         
-        if not queue:
-            # No messages, wait briefly
-            await asyncio.sleep(min(timeout, 0.1))
-            return None
+        # Wait for message up to timeout duration
+        start_time = asyncio.get_event_loop().time()
+        poll_interval = 0.1
         
-        # Pop highest priority message
-        message = heapq.heappop(queue)
-        self.logger.debug(
-            f"Agent {agent_id} received message {message.message_id} "
-            f"(priority: {message.priority.name})"
-        )
-        return message
+        while True:
+            # Check if message is available
+            if queue:
+                # Pop highest priority message
+                message = heapq.heappop(queue)
+                self.logger.debug(
+                    f"Agent {agent_id} received message {message.message_id} "
+                    f"(priority: {message.priority.name})"
+                )
+                return message
+            
+            # Check if timeout expired
+            elapsed = asyncio.get_event_loop().time() - start_time
+            if elapsed >= timeout:
+                return None
+            
+            # Sleep for a short interval before re-checking
+            await asyncio.sleep(min(poll_interval, timeout - elapsed))
     
     def register_handler(self, message_type: MessageType, handler: Callable):
         """Register a handler for a message type"""
