@@ -6,14 +6,17 @@ the REM engine wakes up and runs a four-phase sleep cycle:
 
 Phase 1 – **Light Sleep (N1)**  — memory sorting, mild decay applied.
 Phase 2 – **Deep Sleep (N2/N3)** — slow-wave consolidation: prune weak
-    memories, compress old episodes into HDDR summaries.
+    memories, compress old episodes (replacing full content with a short
+    summary while preserving the HDDR embedding).
 Phase 3 – **REM** — active synthesis: find novel connections between
     semantically adjacent memories, reinforce identity-aligned episodes.
 Phase 4 – **Returning** — short transition back to awake state.
 
-The cycle is interrupted immediately if activity is detected.  All phase
-durations are intentionally short (seconds, not 90-minute biological cycles)
-so the digital agent consolidates frequently.
+Activity detected during any phase interrupts the cycle immediately by
+signalling a ``asyncio.Event``, so the wait on each phase's sleep unblocks
+without having to wait for the full phase duration.  All phase durations are
+intentionally short (seconds, not 90-minute biological cycles) so the digital
+agent consolidates frequently.
 """
 
 import asyncio
@@ -90,6 +93,9 @@ class REMCycleEngine:
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
 
+        # Event used to interrupt phase sleeps immediately when activity occurs
+        self._wake_event: asyncio.Event = asyncio.Event()
+
         self.cycle_history: List[REMCycleStats] = []
         self.logger = logging.getLogger("REMCycleEngine")
 
@@ -98,8 +104,20 @@ class REMCycleEngine:
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Start the background idle-monitoring loop."""
+        """Start the background idle-monitoring loop.
+
+        Safe to call multiple times — a second call while already running
+        is a no-op (the existing task is kept).  If ``is_running`` is stale
+        (task finished abnormally without ``stop()`` being called), the state
+        is corrected and a fresh task is started.
+        """
+        task_alive = self._task is not None and not self._task.done()
+        if self.is_running and task_alive:
+            self.logger.warning("REM cycle engine is already running; ignoring start()")
+            return
+        # Correct potentially stale is_running flag before (re)starting
         self.is_running = True
+        self._wake_event.clear()
         self._task = asyncio.create_task(self._monitor_loop())
         self.logger.info("REM cycle engine started")
 
@@ -122,24 +140,32 @@ class REMCycleEngine:
         """
         Notify the engine that the system is active.
 
-        Resets the idle timer; if currently sleeping, the cycle is
-        interrupted and the engine returns to awake state.
+        Resets the idle timer and, if currently sleeping, signals the wake
+        event so any in-progress phase sleep is interrupted immediately rather
+        than waiting for the phase duration to expire.
         """
         self.last_activity_time = datetime.now()
         if self.current_phase != REMPhase.AWAKE:
+            self._wake_event.set()  # unblocks _phase_sleep() immediately
             self._wake_up()
 
     # ------------------------------------------------------------------
     # Public triggers
     # ------------------------------------------------------------------
 
-    async def force_cycle(self) -> REMCycleStats:
+    async def force_cycle(self, *, time_scale: float = 1.0) -> REMCycleStats:
         """
         Immediately trigger a full sleep cycle regardless of idle state.
 
         Useful for testing or explicit memory consolidation requests.
+
+        Args:
+            time_scale: Multiplier applied to all phase durations.  Pass
+                ``0.0`` (or any value near zero) to skip real-time sleeping
+                entirely — phases execute instantly, which is useful for fast,
+                deterministic tests.
         """
-        return await self._run_sleep_cycle()
+        return await self._run_sleep_cycle(time_scale=time_scale)
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -181,7 +207,21 @@ class REMCycleEngine:
             except Exception as exc:
                 self.logger.error("REM monitor error: %s", exc)
 
-    async def _run_sleep_cycle(self) -> REMCycleStats:
+    async def _phase_sleep(self, duration: float, time_scale: float) -> None:
+        """
+        Sleep for ``duration * time_scale`` seconds, but wake immediately if
+        ``_wake_event`` is set (i.e. activity was detected mid-phase).
+        """
+        scaled = duration * time_scale
+        if scaled <= 0:
+            return
+        self._wake_event.clear()
+        try:
+            await asyncio.wait_for(self._wake_event.wait(), timeout=scaled)
+        except asyncio.TimeoutError:
+            pass  # Normal case: full phase duration elapsed without activity
+
+    async def _run_sleep_cycle(self, *, time_scale: float = 1.0) -> REMCycleStats:
         """Execute a complete four-phase sleep cycle."""
         self.cycle_count += 1
         stats = REMCycleStats(
@@ -197,7 +237,7 @@ class REMCycleEngine:
         stats.phase = REMPhase.LIGHT_SLEEP
         if self.memory:
             self._light_sleep_decay()
-        await asyncio.sleep(self.PHASE_DURATIONS[REMPhase.LIGHT_SLEEP])
+        await self._phase_sleep(self.PHASE_DURATIONS[REMPhase.LIGHT_SLEEP], time_scale)
         if not self._is_idle():
             return self._complete_cycle(stats)
 
@@ -207,7 +247,7 @@ class REMCycleEngine:
         if self.memory:
             stats.memories_pruned = self._deep_sleep_consolidation()
             stats.memories_compressed = self._compress_old_memories()
-        await asyncio.sleep(self.PHASE_DURATIONS[REMPhase.DEEP_SLEEP])
+        await self._phase_sleep(self.PHASE_DURATIONS[REMPhase.DEEP_SLEEP], time_scale)
         if not self._is_idle():
             return self._complete_cycle(stats)
 
@@ -216,11 +256,11 @@ class REMCycleEngine:
         stats.phase = REMPhase.REM
         stats.novel_connections = self._rem_synthesis()
         stats.identity_reinforcements = self._reinforce_identity()
-        await asyncio.sleep(self.PHASE_DURATIONS[REMPhase.REM])
+        await self._phase_sleep(self.PHASE_DURATIONS[REMPhase.REM], time_scale)
 
         # --- Phase 4: Returning ---
         self.current_phase = REMPhase.RETURNING
-        await asyncio.sleep(self.PHASE_DURATIONS[REMPhase.RETURNING])
+        await self._phase_sleep(self.PHASE_DURATIONS[REMPhase.RETURNING], time_scale)
 
         self.current_phase = REMPhase.AWAKE
         return self._complete_cycle(stats)
@@ -258,8 +298,10 @@ class REMCycleEngine:
         """
         Compress episodes older than 7 days with importance < 0.7.
 
-        Compression replaces the full content string with a short summary
-        while preserving the HDDR embedding for future recall.
+        Compression truncates ``ep.content`` to a short summary string and sets
+        ``ep.is_compressed = True``.  The HDDR embedding is preserved intact so
+        the episode remains searchable via semantic recall even after its full
+        content is reduced.
 
         Returns the number of episodes compressed.
         """
@@ -279,7 +321,9 @@ class REMCycleEngine:
             ):
                 content_str = str(ep.content)
                 if len(content_str) > 100:
-                    ep.compression_summary = content_str[:80] + "… [compressed]"
+                    summary = content_str[:80] + "… [compressed]"
+                    ep.compression_summary = summary
+                    ep.content = summary   # replace full content with summary
                     ep.is_compressed = True
                     compressed += 1
 

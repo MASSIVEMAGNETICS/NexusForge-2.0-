@@ -14,6 +14,7 @@ Covers:
 """
 
 import asyncio
+import datetime as _dt
 import math
 import numpy as np
 import pytest
@@ -33,6 +34,7 @@ from nexusforge import (
     SensoryModality,
 )
 from nexusforge.memory.episodic_memory import HDDREncoder, MemoryEpisode
+from nexusforge.memory.rem_cycle import REMPhase
 
 
 # ===========================================================================
@@ -302,7 +304,7 @@ class TestREMCycleEngine:
     @pytest.mark.asyncio
     async def test_force_cycle_runs_without_memory(self):
         engine = REMCycleEngine()
-        stats = await engine.force_cycle()
+        stats = await engine.force_cycle(time_scale=0.0)
         assert stats.cycle_number == 1
         assert stats.end_time is not None
 
@@ -312,7 +314,7 @@ class TestREMCycleEngine:
         for i in range(20):
             mem.store(f"memory episode {i}", importance=0.6)
         engine = REMCycleEngine(episodic_memory=mem)
-        stats = await engine.force_cycle()
+        stats = await engine.force_cycle(time_scale=0.0)
         assert stats.cycle_count if hasattr(stats, "cycle_count") else True
         assert stats.end_time is not None
 
@@ -325,7 +327,7 @@ class TestREMCycleEngine:
                        "music theory basics"]:
             mem.store(topic, importance=0.8)
         engine = REMCycleEngine(episodic_memory=mem)
-        stats = await engine.force_cycle()
+        stats = await engine.force_cycle(time_scale=0.0)
         # At least some connections should be found among related topics
         assert stats.novel_connections >= 0  # non-negative
 
@@ -343,11 +345,10 @@ class TestREMCycleEngine:
         engine = REMCycleEngine(episodic_memory=mem, identity_anchor=anchor)
         # Set last_activity_time far in the past so _is_idle() is True on all
         # inter-phase checks, allowing all phases (including REM reinforce) to run.
-        import datetime as _dt
         engine.last_activity_time = _dt.datetime.now() - _dt.timedelta(seconds=999)
 
         importance_before = ep.importance
-        await engine.force_cycle()
+        await engine.force_cycle(time_scale=0.0)
         # Net effect: light-sleep decay (−0.003) + deep-sleep decay (−0.005)
         # + REM reinforce (+0.05) ≈ +0.042 net gain for a high-alignment memory.
         assert ep.importance > importance_before - 0.02  # net positive or very small loss
@@ -359,6 +360,25 @@ class TestREMCycleEngine:
         assert engine.is_running
         await engine.stop()
         assert not engine.is_running
+
+    @pytest.mark.asyncio
+    async def test_start_is_idempotent(self):
+        """Calling start() twice must not create a second background task."""
+        engine = REMCycleEngine(idle_threshold=999.0)
+        await engine.start()
+        task_before = engine._task
+        await engine.start()  # second call — should be a no-op
+        assert engine._task is task_before
+        await engine.stop()
+
+    @pytest.mark.asyncio
+    async def test_record_activity_interrupts_phase(self):
+        """Activity during a phase should set wake_event immediately."""
+        engine = REMCycleEngine()
+        engine.current_phase = REMPhase.LIGHT_SLEEP  # simulate in-sleep
+        engine.record_activity()
+        assert engine.current_phase == REMPhase.AWAKE
+        assert engine._wake_event.is_set()
 
     def test_get_stats_structure(self):
         engine = REMCycleEngine()
@@ -506,6 +526,40 @@ class TestGravitationalAttention:
         assert out.shape == (1, 3, 16)
         assert not np.any(np.isnan(out))
 
+    def test_learnable_G_false_freezes_constant(self):
+        """When learnable_G=False, G must always equal the initial value."""
+        init_G = 3.7
+        cfg = GravitationalConfig(
+            dim_model=16, dim_position=4,
+            gravitational_constant=init_G, learnable_G=False
+        )
+        layer = GravitationalAttentionLayer(cfg)
+        # Mutate _log_G to simulate a training step
+        layer._log_G += 999.0
+        assert abs(layer.G - init_G) < 1e-9, (
+            "G must be frozen at initial value when learnable_G=False"
+        )
+
+    def test_learnable_G_true_uses_log_G(self):
+        """When learnable_G=True, G must reflect _log_G."""
+        cfg = GravitationalConfig(
+            dim_model=16, dim_position=4,
+            gravitational_constant=1.0, learnable_G=True
+        )
+        layer = GravitationalAttentionLayer(cfg)
+        layer._log_G = math.log(5.0)
+        assert abs(layer.G - 5.0) < 1e-9
+
+    def test_softplus_no_overflow_with_large_input(self):
+        """Numerically-stable softplus must not produce inf masses."""
+        cfg = GravitationalConfig(dim_model=16, dim_position=4)
+        layer = GravitationalAttentionLayer(cfg, seed=5)
+        # Construct input that produces very large raw_mass
+        X = np.full((1, 4, 16), 1e6)
+        out = layer.forward(X)
+        assert not np.any(np.isinf(out)), "Forward pass must not produce inf values"
+        assert not np.any(np.isnan(out)), "Forward pass must not produce NaN values"
+
 
 # ===========================================================================
 # GravitationalTokenFormer
@@ -571,6 +625,13 @@ class TestGravitationalTokenFormer:
         assert cfg["dim_model"] == 32
         assert cfg["num_layers"] == 2
         assert cfg["vocab_size"] == 64
+
+    def test_encode_raises_on_seq_too_long(self):
+        """encode() must raise ValueError (not AssertionError) when seq too long."""
+        model = self._make_model()  # max_seq_len=32
+        token_ids = np.random.randint(0, 64, (1, 40))  # 40 > 32
+        with pytest.raises(ValueError, match="max_seq_len"):
+            model.encode(token_ids)
 
 
 # ===========================================================================
@@ -688,6 +749,19 @@ class TestNexusForgeMemoryIntegration:
         assert result["episode_id"] is not None
 
     @pytest.mark.asyncio
+    async def test_remember_resets_idle_timer(self):
+        """remember() must call rem_engine.record_activity() so idle timer resets."""
+        nexus = NexusForge()
+        # Wind the idle clock back so the engine looks idle
+        nexus.rem_engine.last_activity_time = _dt.datetime.now() - _dt.timedelta(seconds=9999)
+        # remember() should reset the timer
+        nexus.remember("some important event", importance=0.8)
+        idle = (
+            _dt.datetime.now() - nexus.rem_engine.last_activity_time
+        ).total_seconds()
+        assert idle < 5, "remember() should have reset the idle timer"
+
+    @pytest.mark.asyncio
     async def test_remember_and_recall(self):
         nexus = NexusForge()
         nexus.remember("the gravitational tokenformer processes sequences", importance=0.9)
@@ -720,7 +794,7 @@ class TestNexusForgeMemoryIntegration:
     async def test_force_rem_cycle(self):
         nexus = NexusForge()
         nexus.remember("consolidate this memory", importance=0.7)
-        result = await nexus.force_rem_cycle()
+        result = await nexus.force_rem_cycle(time_scale=0.0)
         assert "cycle_number" in result
         assert result["cycle_number"] == 1
 

@@ -278,6 +278,7 @@ class NexusForge:
         Returns:
             Episode ID (str) or ``None`` if filtered by sparse parsing.
         """
+        self.rem_engine.record_activity()
         return self.episodic_memory.store(
             content=content,
             importance=importance,
@@ -353,17 +354,21 @@ class NexusForge:
         """
         return self.synthesis_engine.synthesize(seed=seed, top_k=top_k)
 
-    async def force_rem_cycle(self) -> Dict[str, Any]:
+    async def force_rem_cycle(self, *, time_scale: float = 1.0) -> Dict[str, Any]:
         """
         Manually trigger a REM sleep cycle immediately.
 
         Useful when you want to consolidate memory on demand rather than
         waiting for the idle threshold.
 
+        Args:
+            time_scale: Multiplier applied to phase durations (``0.0`` = no
+                real-time sleep, useful for tests).
+
         Returns:
             Stats from the completed cycle.
         """
-        stats = await self.rem_engine.force_cycle()
+        stats = await self.rem_engine.force_cycle(time_scale=time_scale)
         return {
             "cycle_number": stats.cycle_number,
             "memories_pruned": stats.memories_pruned,

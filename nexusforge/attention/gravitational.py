@@ -44,7 +44,13 @@ class GravitationalConfig:
     """Semantic space-time position dimensionality."""
 
     num_heads: int = 1
-    """Number of parallel gravitational attention heads."""
+    """Number of parallel gravitational attention heads.
+
+    .. note::
+        Multi-head gravitational attention is reserved for a future extension.
+        The current implementation is single-head regardless of this value.
+        Setting ``num_heads > 1`` has no effect until multi-head support is added.
+    """
 
     gravitational_constant: float = 1.0
     """Initial value of G (Newton's gravitational constant analogue)."""
@@ -59,7 +65,13 @@ class GravitationalConfig:
     """Space-time curvature (0 = flat Euclidean, > 0 = curved)."""
 
     learnable_G: bool = True
-    """Whether G is treated as a learnable parameter (tracked as state)."""
+    """Whether G is a trainable parameter.
+
+    * ``True``  — ``_log_G`` is stored as mutable state; a gradient-based
+      training loop can update it via ``layer._log_G += lr * grad``.
+    * ``False`` — G is frozen at its initial value; ``layer.G`` always returns
+      ``gravitational_constant`` unchanged.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +120,11 @@ class GravitationalAttentionLayer:
         self.W_value = self._xavier(d, d, rng)        # d_model → d_model
         self.W_output = self._xavier(d, d, rng)       # d_model → d_model
 
-        # Learnable gravitational constant (log-space for positivity)
+        # Gravitational constant — stored in log-space when learnable so that
+        # any gradient step keeps G positive.  When not learnable, _fixed_G
+        # holds the frozen initial value.
         self._log_G = math.log(max(config.gravitational_constant, 1e-8))
+        self._fixed_G: float = config.gravitational_constant
 
         # Metric tensor for curved space-time
         if config.curvature > 0:
@@ -123,7 +138,14 @@ class GravitationalAttentionLayer:
 
     @property
     def G(self) -> float:
-        """Current gravitational constant (always positive)."""
+        """Current gravitational constant (always positive).
+
+        Returns the fixed initial value when ``config.learnable_G`` is
+        ``False``; otherwise returns ``exp(_log_G)`` which a training loop
+        can update by adjusting ``_log_G``.
+        """
+        if not self.config.learnable_G:
+            return self._fixed_G
         return math.exp(self._log_G)
 
     def forward(
@@ -145,7 +167,11 @@ class GravitationalAttentionLayer:
         # 1. Positions and masses
         positions = X @ self.W_position           # (B, L, dp)
         raw_mass = X @ self.W_mass                 # (B, L, 1)
-        masses = np.log1p(np.exp(raw_mass)) + 0.01  # softplus, always > 0
+        # Numerically-stable softplus: log(1 + exp(x)) = log1p(exp(-|x|)) + max(x, 0)
+        # avoids overflow for large positive raw_mass values.
+        masses = (
+            np.log1p(np.exp(-np.abs(raw_mass))) + np.maximum(raw_mass, 0) + 0.01
+        )
 
         # 2. Values
         values = X @ self.W_value                  # (B, L, d)

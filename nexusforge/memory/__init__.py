@@ -1,8 +1,10 @@
 """
 NexusForge Memory System
 
-Implements persistent, identity-locked memory with REM sleep cycles,
-episodic storage, HDDR compression, and self-synthesis.
+In-memory identity-locked episodic store with REM sleep cycle consolidation,
+HDDR compression, and self-synthesis.  All state is held in Python objects
+(no file or database I/O); callers that need durable persistence should
+serialise the ``EpisodicMemory`` instance externally.
 """
 
 from nexusforge.memory.identity_anchor import IdentityAnchor, IdentityVector

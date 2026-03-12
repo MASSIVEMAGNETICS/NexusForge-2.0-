@@ -321,9 +321,10 @@ class GravitationalTokenFormer:
             * ``importance_map``: per-token salience scores ``(batch, seq_len)``
         """
         batch, seq_len = token_ids.shape
-        assert seq_len <= self.config.max_seq_len, (
-            f"Sequence length {seq_len} exceeds max_seq_len {self.config.max_seq_len}"
-        )
+        if seq_len > self.config.max_seq_len:
+            raise ValueError(
+                f"Sequence length {seq_len} exceeds max_seq_len {self.config.max_seq_len}"
+            )
 
         # Embedding lookup + positional encoding
         tok = self.token_embed[token_ids]           # (B, L, d)
