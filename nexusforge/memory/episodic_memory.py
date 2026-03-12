@@ -287,7 +287,7 @@ class EpisodicMemory:
         identity_alignment = 0.5
         if self.identity_anchor and self.identity_anchor.is_configured():
             raw = self.identity_anchor.compute_alignment(content_str)
-            identity_alignment = (raw + 1.0) / 2.0  # map [-1,1] → [0,1]
+            identity_alignment = raw  # already in [0, 1]
 
         episode = MemoryEpisode(
             episode_id=str(uuid.uuid4()),

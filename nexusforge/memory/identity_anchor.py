@@ -107,21 +107,25 @@ class IdentityAnchor:
         """
         Compute identity alignment score for given text.
 
-        Returns a value in [-1, 1] where:
+        Returns a cosine similarity in [0, 1] where:
           * **1.0** — perfectly aligned with identity
-          * **0.0** — neutral / unrelated
-          * **-1.0** — counter-aligned (conflicts with identity)
+          * **0.5** — moderately similar (~60° angle)
+          * **0.0** — orthogonal / completely unrelated to identity
 
-        If no identity has been set, returns 0.5 (neutral).
+        Negative values are not possible because the embedding vectors are
+        non-negative, so 0.0 is the minimum (orthogonal), not counter-aligned.
+
+        If no identity has been set, returns 0.5 (moderate similarity midpoint).
         """
         if not self.identity_vector:
             return 0.5
 
         text_vector = self._compute_embedding(text, self.identity_vector.vocabulary)
 
-        # Cosine similarity
+        # Similarity score in [0, 1] — embedding vectors are non-negative so
+        # the dot product of two unit vectors always falls in [0, 1].
         dot = sum(a * b for a, b in zip(self.identity_vector.vector, text_vector))
-        return max(-1.0, min(1.0, dot))
+        return max(0.0, min(1.0, dot))
 
     def is_configured(self) -> bool:
         """Check whether an identity paragraph has been provided."""

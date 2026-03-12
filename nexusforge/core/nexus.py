@@ -18,12 +18,12 @@ from nexusforge.agents.experts import MultiModalExpertSystem, ExpertModality
 
 # Memory subsystems
 from nexusforge.memory.identity_anchor import IdentityAnchor
-from nexusforge.memory.episodic_memory import EpisodicMemory, MemoryType
+from nexusforge.memory.episodic_memory import EpisodicMemory
 from nexusforge.memory.rem_cycle import REMCycleEngine
 from nexusforge.memory.synthesis import SelfSynthesisEngine
 
 # Sensory processing
-from nexusforge.sensory.processor import SensoryProcessor, SensoryModality
+from nexusforge.sensory.processor import SensoryProcessor
 
 
 class NexusForge:
