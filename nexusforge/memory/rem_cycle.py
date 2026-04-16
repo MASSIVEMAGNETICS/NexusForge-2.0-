@@ -165,7 +165,7 @@ class REMCycleEngine:
                 entirely — phases execute instantly, which is useful for fast,
                 deterministic tests.
         """
-        return await self._run_sleep_cycle(time_scale=time_scale)
+        return await self._run_sleep_cycle(time_scale=time_scale, force=True)
 
     # ------------------------------------------------------------------
     # Diagnostics
@@ -221,8 +221,16 @@ class REMCycleEngine:
         except asyncio.TimeoutError:
             pass  # Normal case: full phase duration elapsed without activity
 
-    async def _run_sleep_cycle(self, *, time_scale: float = 1.0) -> REMCycleStats:
-        """Execute a complete four-phase sleep cycle."""
+    async def _run_sleep_cycle(self, *, time_scale: float = 1.0, force: bool = False) -> REMCycleStats:
+        """Execute a complete four-phase sleep cycle.
+
+        Args:
+            time_scale: Multiplier applied to all phase durations.
+            force: When ``True`` (set by :meth:`force_cycle`), all four phases
+                always run regardless of the current idle state.  When
+                ``False`` (used by the background monitor), phases abort early
+                if activity is detected between them.
+        """
         self.cycle_count += 1
         stats = REMCycleStats(
             cycle_number=self.cycle_count,
@@ -238,7 +246,7 @@ class REMCycleEngine:
         if self.memory:
             self._light_sleep_decay()
         await self._phase_sleep(self.PHASE_DURATIONS[REMPhase.LIGHT_SLEEP], time_scale)
-        if not self._is_idle():
+        if not force and not self._is_idle():
             return self._complete_cycle(stats)
 
         # --- Phase 2: Deep Sleep ---
@@ -248,7 +256,7 @@ class REMCycleEngine:
             stats.memories_pruned = self._deep_sleep_consolidation()
             stats.memories_compressed = self._compress_old_memories()
         await self._phase_sleep(self.PHASE_DURATIONS[REMPhase.DEEP_SLEEP], time_scale)
-        if not self._is_idle():
+        if not force and not self._is_idle():
             return self._complete_cycle(stats)
 
         # --- Phase 3: REM ---

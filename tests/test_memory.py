@@ -315,21 +315,26 @@ class TestREMCycleEngine:
             mem.store(f"memory episode {i}", importance=0.6)
         engine = REMCycleEngine(episodic_memory=mem)
         stats = await engine.force_cycle(time_scale=0.0)
-        assert stats.cycle_count if hasattr(stats, "cycle_count") else True
+        assert stats.cycle_number == 1
         assert stats.end_time is not None
 
     @pytest.mark.asyncio
     async def test_rem_synthesis_creates_connections(self):
         mem = EpisodicMemory()
-        # Store episodes that should have moderate similarity
-        for topic in ["gravity pulls objects", "mass attracts matter",
-                       "force between bodies", "recipe for bread",
-                       "music theory basics"]:
+        # These specific topics produce HDDR similarity in the 0.2–0.6 range
+        # that triggers novel-connection tagging during REM synthesis.
+        for topic in [
+            "gravity pulls objects toward each other",
+            "mass attracts nearby matter strongly",
+            "force between bodies depends on mass",
+            "gravitational force decreases with distance",
+            "recipe for bread requires flour and water",
+        ]:
             mem.store(topic, importance=0.8)
         engine = REMCycleEngine(episodic_memory=mem)
         stats = await engine.force_cycle(time_scale=0.0)
-        # At least some connections should be found among related topics
-        assert stats.novel_connections >= 0  # non-negative
+        # At least one novel cross-memory connection must be found
+        assert stats.novel_connections > 0
 
     @pytest.mark.asyncio
     async def test_identity_reinforcement(self):
